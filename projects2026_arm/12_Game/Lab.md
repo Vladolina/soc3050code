@@ -138,6 +138,13 @@ $PERF,<fps>,<ups>,<flush_us>,<max_us>,<bytes/frame>,<busy %>,<mode>*CS
 > 400 kHz and 9 bits per byte, but `i2c.c` polls each byte and ST's `TIMINGR`
 > is not exactly 400 kHz. **Write down the real full-frame time** — it is the
 > number every later lesson's display budget starts from.
+>
+> **In Wokwi, expect every flush to take about 4× the table.** Its I²C runs at
+> about 100 kHz whatever `TIMINGR` says; a full repaint measured **106 ms**
+> there (2026-11-01). So `FULL` mode drops well below 40 fps. `ups` holds 50
+> only while a frame takes under 80 ms (`MAX_CATCHUP` = 4 updates); past that
+> the loop gives the time up and `ups` falls too — `FULL` mode in Wokwi should
+> show it. Not yet measured: write down which you ran on, and both numbers.
 
 ---
 

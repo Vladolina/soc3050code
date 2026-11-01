@@ -16,8 +16,9 @@ want to show people: an arcade with SNAKE, BREAKOUT and FLAP.
 
 Figures marked **measured on the host** come from `host/test_games.c`, which
 compiles the *real* game files and the *real* display driver with plain gcc and
-plays them with scripted joysticks. Nothing in this deck was watched in Wokwi;
-the last two slides say what that leaves open.
+plays them with scripted joysticks. The game was **watched running in Wokwi**
+on 2026-11-01 (menu, start, stick, sound), but its timing was not measured
+there; the last two slides say what that leaves open.
 
 ---
 
@@ -674,7 +675,9 @@ send what did not change.**
 
 These numbers are a model; the board measures the real one. `$PERF`'s
 `flush_us` field is that measurement (slide 14), and the real `TIMINGR` clock
-is not exactly 400 kHz.
+is not exactly 400 kHz. **In Wokwi the bus is slower still:** its I²C runs at
+about 100 kHz whatever `TIMINGR` says, and a full repaint measured 106 ms there
+(2026-11-01). Dirty pages matter even more in the simulator.
 
 ---
 
@@ -1333,13 +1336,16 @@ HUD's `snprintf` and the serial frames — twice the largest game function,
   every frame is a full repaint;
 - the `$SCORE` frame's checksum, the high score, the screenshots.
 
-**Not measured, because nothing here ran in Wokwi:**
+**Watched in Wokwi (2026-11-01):** the SSD1306 accepts the init sequence and
+the page writes, A starts a game, the stick moves the menu, the buzzer plays.
+It took three Wokwi-only fixes (stale I²C `TXIS`, a timer left counting, a
+`WFI` that never woke) — see the lesson README.
 
-- the real flush time — `i2c.c` is polled and its `TIMINGR` is not exactly
-  400 kHz; `$PERF`'s `flush_us` will say;
-- whether Wokwi's SSD1306 accepts the init sequence and the 129-byte page
-  writes (it documents support for Adafruit's library, which sends the same
-  commands);
+**Not measured yet:**
+
+- the real flush time on silicon — `i2c.c` is polled and its `TIMINGR` is not
+  exactly 400 kHz; `$PERF`'s `flush_us` will say. Wokwi's I²C runs at about
+  100 kHz (a full repaint: 106 ms), so its figures are not silicon's;
 - CPU time of update and draw (`busy %` minus the flush);
 - whether the keys `a` and `b` reach the buttons while the joystick has focus;
 - whether it is fun at level 3.
