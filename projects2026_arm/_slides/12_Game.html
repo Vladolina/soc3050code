@@ -492,6 +492,37 @@
 <p>Not rows of pixels, as on a PC — <strong>vertical strips of eight</strong>. That one fact<br>shapes everything below: the unit of transfer is a byte that is a column, and<br>the natural unit of &quot;this part changed&quot; is a <strong>page</strong>, 8 rows deep.</p>
 </section>
 <section class="slide">
+<h2>Slide 3b: I²C — Two Wires, One Byte at a Time</h2>
+<p>Everything the MCU tells the panel travels over <strong>I²C</strong>: two wires shared by<br>every chip on the bus. On the app board the same pair also reaches the<br>MPU6050 motion sensor that the drone and robot lessons read.</p>
+<figure class="diagram"><svg viewBox="0 0 580 190" role="img" aria-label="I2C bus: SCL and SDA with pull-up resistors, the STM32 controller, the SSD1306 at 0x3C and the MPU6050 at 0x68">
+  <text x="20" y="40" class="mono">SDA</text>
+  <text x="20" y="80" class="mono">SCL</text>
+  <path class="wire" d="M60 36 H560"/>
+  <path class="wire" d="M60 76 H560"/>
+  <rect class="reg" x="80" y="4" width="20" height="26"/>
+  <rect class="reg" x="110" y="4" width="20" height="26"/>
+  <text x="130" y="0" class="lbl">pull-ups</text>
+  <rect class="hifill" x="60" y="110" width="110" height="46" rx="5"/>
+  <text x="115" y="130" text-anchor="middle" class="mono">STM32</text>
+  <text x="115" y="146" text-anchor="middle" class="lbl">controller, PB8/PB9</text>
+  <rect class="box" x="230" y="110" width="110" height="46" rx="5"/>
+  <text x="285" y="130" text-anchor="middle" class="mono">SSD1306</text>
+  <text x="285" y="146" text-anchor="middle" class="lbl">0x3C</text>
+  <rect class="box" x="400" y="110" width="110" height="46" rx="5"/>
+  <text x="455" y="130" text-anchor="middle" class="mono">MPU6050</text>
+  <text x="455" y="146" text-anchor="middle" class="lbl">0x68</text>
+  <path class="wire" d="M100 110 V36 M130 110 V76 M270 110 V36 M300 110 V76 M440 110 V36 M470 110 V76"/>
+  <text x="290" y="182" text-anchor="middle" class="lbl">Every device sees every byte; each answers only to its own 7-bit address.</text>
+</svg></figure>
+<table><thead><tr><th>Word</th><th>Meaning</th></tr></thead><tbody><tr><td><strong>SCL, SDA</strong></td><td>clock and data. The controller (the STM32) drives the clock; data goes either way</td></tr><tr><td><strong>open drain</strong></td><td>a chip can only pull a line <strong>low</strong>; resistors pull it high. Two chips can never fight — a low always wins, harmlessly</td></tr><tr><td><strong>START, STOP</strong> (<code>S</code>, <code>P</code>)</td><td>SDA falling, then rising, while SCL is high: &quot;a transfer begins&quot; / &quot;the bus is free again&quot;</td></tr><tr><td><strong>address byte</strong></td><td>7-bit address, then one direction bit: 0 = write, 1 = read. <code>0x3C</code> + write goes out as <code>0x78</code></td></tr><tr><td><strong>ACK / NACK</strong> (<code>A</code>, <code>N</code>)</td><td>after every byte the receiver pulls SDA low for one clock — &quot;got it&quot;. <strong>No ACK after the address means nobody is there</strong></td></tr></tbody></table>
+<p>One command to the panel — &quot;display on&quot;, <code>AF</code> — is one write transfer:</p>
+<pre><code>S | 0x3C+W | A | 0x00 | A | 0xAF | A | P
+    address       control  command      stop
+                  (slide 5b)</code></pre>
+<p>Each byte costs <strong>9 clocks</strong> — 8 data bits and the ACK. That one number is the<br>whole of slide 8&#x27;s bus budget.</p>
+<p>The driver, <code>_lib/i2c.c</code>, reports three outcomes, and <code>Main.c</code> prints them at<br>boot: <strong>OK</strong>; <strong>NACK</strong> — nobody answered at <code>0x3C</code> (wrong address, or SCL/SDA<br>miswired); <strong>timeout</strong> — no answer of any kind, the bus is stuck. Slides 7 and<br>7b show how the STM32&#x27;s I²C block runs all of this in hardware.</p>
+</section>
+<section class="slide">
 <h2>Slide 4: A Pixel Is a Bit — Which Byte, Which Bit</h2>
 <p>Pixel (<em>x</em>, <em>y</em>) is bit (<em>y</em> % 8) of byte <code>fb[y / 8][x]</code>. In <code>oled.c</code>:</p>
 <pre class="lang-c"><code>void oled_pixel(int x, int y, int colour)
@@ -879,12 +910,12 @@ S | 0x3C+W | A | 0x40 | A | px  | A | px  ... | P        128 pixel bytes</code><
 <table><thead><tr><th>Bytes</th><th>Command</th><th>Why</th></tr></thead><tbody><tr><td><code>AE</code></td><td>display off</td><td>configure in the dark</td></tr><tr><td><code>D5 80</code></td><td>clock divide</td><td>the default</td></tr><tr><td><code>A8 3F</code></td><td>multiplex 64</td><td>this panel has 64 rows</td></tr><tr><td><code>D3 00</code> · <code>40</code></td><td>offset 0, start line 0</td><td></td></tr><tr><td><strong><code>8D 14</code></strong></td><td><strong>charge pump on</strong></td><td><strong>without it the panel stays dark</strong></td></tr><tr><td><code>20 00</code></td><td>horizontal addressing</td><td>column, then page — slide 7b</td></tr><tr><td><code>A1</code> · <code>C8</code></td><td>segment remap, COM scan down</td><td>x left→right, y top→bottom</td></tr><tr><td><code>DA 12</code></td><td>COM pin layout</td><td>for 64 rows</td></tr><tr><td><code>81 CF</code> · <code>D9 F1</code> · <code>DB 40</code></td><td>contrast, pre-charge, VCOMH</td><td></td></tr><tr><td><code>A4</code> · <code>A6</code> · <code>AF</code></td><td>show RAM, not inverted, <strong>on</strong></td><td></td></tr></tbody></table>
 <p>Checked against Adafruit&#x27;s <code>Adafruit_SSD1306</code> library, which sends the same<br>values for a 128×64 panel with the internal charge pump (plus <code>2E</code>, &quot;stop<br>scrolling&quot;, which is already the state after reset).</p>
 <p><strong>Measured on the host</strong> (the stub counts what <code>oled_init()</code> sends): <strong>32<br>transfers, 1 161 bytes</strong> — 16 commands, then a cleared screen, all 8 pages.</p>
-<p><code>8D 14</code> is the classic silent failure: every command ACKs, the RAM fills<br>perfectly, and the glass stays black because nothing generates its drive<br>voltage. It is lesson 09&#x27;s MPU6050 sleep bit, in a display.</p>
+<p><code>8D 14</code> is the classic silent failure: every command ACKs, the RAM fills<br>perfectly, and the glass stays black because nothing generates its drive<br>voltage. The bus can be perfect and the device still do nothing until one bit<br>is set — the same trap as a sensor that powers up asleep.</p>
 </section>
 <section class="slide">
 <h2>Slide 7: I2C1 — the MCU&#x27;s Side of the Wire, on One Page</h2>
-<p>Every byte above leaves through <strong>I2C1</strong> at <strong>0x40005400</strong> (<code>I2C_TypeDef</code> in<br><code>stm32c031xx.h</code>), driven by <code>_lib/i2c.c</code> exactly as in lesson 09:</p>
-<table><thead><tr><th>Offset</th><th>Register</th><th>Its job</th><th><code>i2c.c</code> here</th><th>Slide</th></tr></thead><tbody><tr><td>0x00</td><td><strong><code>CR1</code></strong></td><td>enable, interrupts, filters</td><td><code>PE</code> = 0, then 1 around <code>TIMINGR</code></td><td>lesson 09</td></tr><tr><td>0x04</td><td><strong><code>CR2</code></strong></td><td>one transfer: address, direction, count, start / stop</td><td><code>SADD</code>, <code>RD_WRN</code>, <code>NBYTES</code>, <code>AUTOEND</code>, <code>START</code>, <code>STOP</code></td><td>7b</td></tr><tr><td>0x08, 0x0C</td><td><code>OAR1</code>, <code>OAR2</code></td><td>the MCU&#x27;s own address, as a target</td><td>—</td><td></td></tr><tr><td>0x10</td><td><strong><code>TIMINGR</code></strong></td><td>SCL high / low times: the bus speed</td><td><code>0x0090273D</code> once</td><td>8</td></tr><tr><td>0x14</td><td><code>TIMEOUTR</code></td><td>SMBus timeouts</td><td>—</td><td></td></tr><tr><td>0x18</td><td><strong><code>ISR</code></strong></td><td>status flags, polled</td><td><code>TXIS</code>, <code>RXNE</code>, <code>TC</code>, <code>STOPF</code>, <code>NACKF</code></td><td>8</td></tr><tr><td>0x1C</td><td><strong><code>ICR</code></strong></td><td>write 1 to clear a flag</td><td><code>STOPCF</code>, <code>NACKCF</code></td><td>lesson 09</td></tr><tr><td>0x20</td><td><code>PECR</code></td><td>SMBus packet error check</td><td>—</td><td></td></tr><tr><td>0x24</td><td><strong><code>RXDR</code></strong></td><td>the byte received</td><td>read (MPU6050, not the panel)</td><td>lesson 09</td></tr><tr><td>0x28</td><td><strong><code>TXDR</code></strong></td><td>the next byte to send</td><td>each of the 7 + 129 bytes</td><td>7b, 8</td></tr></tbody></table>
+<p>Every byte above leaves through <strong>I2C1</strong> at <strong>0x40005400</strong> (<code>I2C_TypeDef</code> in<br><code>stm32c031xx.h</code>), driven by <code>_lib/i2c.c</code>. Software never toggles SCL itself:<br>it tells the block <em>what</em> to send, and the block makes the START, address,<br>ACKs and STOP of slide 3b.</p>
+<table><thead><tr><th>Offset</th><th>Register</th><th>Its job</th><th><code>i2c.c</code> here</th><th>Slide</th></tr></thead><tbody><tr><td>0x00</td><td><strong><code>CR1</code></strong></td><td>enable, interrupts, filters</td><td><code>PE</code> = 0, then 1 around <code>TIMINGR</code>; also toggled before every transfer (Wokwi)</td><td></td></tr><tr><td>0x04</td><td><strong><code>CR2</code></strong></td><td>one transfer: address, direction, count, start / stop</td><td><code>SADD</code>, <code>RD_WRN</code>, <code>NBYTES</code>, <code>AUTOEND</code>, <code>START</code>, <code>STOP</code></td><td>7b</td></tr><tr><td>0x08, 0x0C</td><td><code>OAR1</code>, <code>OAR2</code></td><td>the MCU&#x27;s own address, as a target</td><td>—</td><td></td></tr><tr><td>0x10</td><td><strong><code>TIMINGR</code></strong></td><td>SCL high / low times: the bus speed</td><td><code>0x0090273D</code> once</td><td>8</td></tr><tr><td>0x14</td><td><code>TIMEOUTR</code></td><td>SMBus timeouts</td><td>—</td><td></td></tr><tr><td>0x18</td><td><strong><code>ISR</code></strong></td><td>status flags, polled</td><td><code>TXIS</code>, <code>RXNE</code>, <code>TC</code>, <code>STOPF</code>, <code>NACKF</code></td><td>8</td></tr><tr><td>0x1C</td><td><strong><code>ICR</code></strong></td><td>write 1 to clear a flag</td><td><code>STOPCF</code>, <code>NACKCF</code></td><td></td></tr><tr><td>0x20</td><td><code>PECR</code></td><td>SMBus packet error check</td><td>—</td><td></td></tr><tr><td>0x24</td><td><strong><code>RXDR</code></strong></td><td>the byte received</td><td>read (MPU6050, not the panel)</td><td>—</td></tr><tr><td>0x28</td><td><strong><code>TXDR</code></strong></td><td>the next byte to send</td><td>each of the 7 + 129 bytes</td><td>7b, 8</td></tr></tbody></table>
 <figure class="diagram"><svg width="914" viewBox="0 0 914 714" role="img" aria-label="The seven i2c.c touches, drawn to scale.  Shaded = a field it writes or reads.; CR1, 32 bits; CR2, 32 bits; TIMINGR, 32 bits; ISR, 32 bits; ICR, 32 bits; RXDR, 32 bits; TXDR, 32 bits">
 <text x="457" y="16" text-anchor="middle" class="lbl">The seven i2c.c touches, drawn to scale.  Shaded = a field it writes or reads.</text>
 <text x="16" y="59" class="mono">CR1</text>
@@ -1147,7 +1178,7 @@ S | 0x3C+W | A | 0x40 | A | px  | A | px  ... | P        128 pixel bytes</code><
 int rc = command(win, sizeof win);
 if (rc == 0) { rc = i2c_write_read(OLED_ADDR, fb[p], 1u + OLED_W, 0, 0); }</code></pre>
 <p><code>0x21</code> sets the column range, <code>0x22</code> the page range. In horizontal addressing<br>mode the SSD1306 advances its own pointer after every data byte, so 128 bytes<br>land in 128 columns without another address.</p>
-<p>The two <code>I2C1-&gt;CR2</code> values that carry it (lesson 09, slide 8) — 7 command<br>bytes, then 129 data bytes, each with <code>AUTOEND</code>:</p>
+<p>One write to <code>CR2</code> describes a whole transfer — address, byte count, START,<br>and <code>AUTOEND</code> (send the STOP by itself after the last byte). Then software<br>writes each byte to <code>TXDR</code> whenever <code>ISR.TXIS</code> says the block is ready for it.<br>The two <code>CR2</code> values that carry one page — 7 command bytes, then 129 data<br>bytes:</p>
 <figure class="diagram"><svg width="914" viewBox="0 0 914 182" role="img" aria-label="I2C1-&gt;CR2, 32 bits; I2C1-&gt;CR2, 32 bits">
 <text x="16" y="35" class="mono">I2C1-&gt;CR2</text>
 <text x="16" y="50" class="lbl">the window: 0x00 + 6 command bytes</text>
@@ -1600,7 +1631,7 @@ oled_flush();</code></pre>
 <p>Lesson 07 built a kernel. This lesson does not link it, and that is a decision,<br>not an oversight.</p>
 <table><thead><tr><th></th><th>Superloop (this lesson)</th><th>RTOS tasks</th></tr></thead><tbody><tr><td>work to do</td><td>one chain: input → update → draw → flush</td><td>separate activities with separate deadlines</td></tr><tr><td>shared data</td><td>none — one thread owns everything</td><td>the framebuffer, touched by update/draw <em>and</em> flush</td></tr><tr><td>what tasks would need</td><td>—</td><td>a mutex or a second 1 KB buffer, or the flush sends a half-drawn frame (lesson 03&#x27;s tearing, on glass)</td></tr><tr><td>timing</td><td><code>next += 20</code> and <code>__WFI()</code></td><td><code>os_delay_until()</code> — the same idea</td></tr><tr><td>determinism</td><td>the host test replays it exactly</td><td>preemption points vary run to run</td></tr></tbody></table>
 <p>A game is a <strong>single pipeline</strong>: nothing can usefully run while the frame is<br>being computed, and the flush must not overlap the drawing. Splitting it into<br>tasks buys locking and no parallelism.</p>
-<p><strong>The RTOS earns its place when deadlines differ.</strong> A drone reads its IMU and<br>runs its attitude loop hundreds of times a second, and might show status on<br>this same OLED a few times a second — and a 25 ms flush must not delay the<br>motors. There the display belongs in a low-priority task, exactly as lesson 09<br>put its shell at the bottom.</p>
+<p><strong>The RTOS earns its place when deadlines differ.</strong> A drone reads its IMU and<br>runs its attitude loop hundreds of times a second, and might show status on<br>this same OLED a few times a second — and a 25 ms flush must not delay the<br>motors. There the display belongs in a low-priority task, below the control<br>loop.</p>
 </section>
 <section class="slide">
 <h2>Slide 16: Input — Levels, Edges and Zones</h2>
