@@ -81,10 +81,11 @@ static void flap_start(int lvl)
 
 static int flap_step(const pad_t *in)
 {
-    /* A flap is an EDGE - button A or B going down, or the stick pushed up
-     * past half way.  Holding does nothing; that is what makes it a skill. */
+    /* A flap is an EDGE - button A going down, or the stick pushed up past
+     * half way.  Holding does nothing; that is what makes it a skill.  (Not B:
+     * the arcade takes B as pause before a game ever sees it.) */
     int up = in->y > 50;
-    int flap = (in->pressed & (PAD_A | PAD_B)) || (up && !stick_was_up);
+    int flap = (in->pressed & PAD_A) || (up && !stick_was_up);
     stick_was_up = up;
 
     if (waiting) {                       /* hover until the first flap        */

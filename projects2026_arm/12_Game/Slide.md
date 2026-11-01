@@ -339,7 +339,7 @@ exactly as `oled.c`'s framebuffer held them (`host/out/*.svg`).
 |---|---|---|
 | **SNAKE** | stick steers | you hit the wall or yourself |
 | **BREAKOUT** | stick moves the paddle, A serves | three balls are lost |
-| **FLAP** | A (or B, or stick up) flaps | you touch a pipe or the ground |
+| **FLAP** | A (or stick up) flaps | you touch a pipe or the ground |
 
 The **knob** sets the speed, 1–5, in the menu. **B** pauses. Every finished game
 prints a checksummed `$SCORE` line, so the class can keep a leaderboard (Lab
