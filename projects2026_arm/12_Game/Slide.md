@@ -1368,13 +1368,13 @@ From this build (`arm-none-eabi-size -A Main.elf`):
 
 | Section | Bytes | What |
 |---|---:|---|
-| `.text` | 14 092 | code: three games, menu, engine, oled, i2c, pad, adc, beep, printf |
+| `.text` | 14 168 | code: three games, menu, engine, oled, i2c, pad, adc, beep, printf |
 | `.rodata` | 1 568 | the font (475 B), sprites, note tables, strings |
 | `.data` | 132 | initialised variables |
 | `.bss` | 2 580 | framebuffer 1 032, snake ring 806, the rest |
 | stack + heap | 1 536 | reserved by the linker script |
 
-**FLASH 15 980 B of 32 KB (48.8 %), RAM 4 248 B of 12 KB (34.6 %).** Room for
+**FLASH 16 056 B of 32 KB (49.0 %), RAM 4 248 B of 12 KB (34.6 %).** Room for
 a fourth game — Lab Part 8.
 
 The largest piece of code is not a game: newlib-nano's `printf` machinery

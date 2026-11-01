@@ -292,3 +292,14 @@ prediction (~50 fps dirty, full-frame `flush_us`). A full repaint measured
 106 ms there - I2C runs at ~100 kHz in Wokwi whatever `TIMINGR` says - so
 `FULL` mode will not reach 50 fps in the simulator. Also whether the stick's
 HORZ runs the right way in BREAKOUT.
+
+**Taught without lessons 09-11 (2026-11-01).** The class skipped them, so this
+deck is its first contact with I2C. Slide 3b now teaches the bus on one page
+(open drain, START/STOP, the address byte, ACK/NACK, 9 clocks a byte), and
+slides 6, 7, 7b and 15 no longer send the reader back to lesson 09. Lessons
+10 and 11 appear only as forward pointers (DMA, sleep current).
+
+**FLAP flaps on A or stick up, not B** (2026-11-01). `flappy.c` also tested B,
+but the arcade takes B as pause before a game sees it. The host test was not
+re-run after that change - no host gcc on the machine that made it - but it
+never presses B.

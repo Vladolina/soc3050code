@@ -43,7 +43,7 @@ Zero warnings, and:
 
 ```
 Building 11_Faults_Watchdog_Power  [target c031c6] ...
-           FLASH:       25300 B        32 KB     77.21%
+           FLASH:       25340 B        32 KB     77.33%
              RAM:        5256 B        12 KB     42.77%
 ```
 

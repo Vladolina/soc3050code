@@ -745,7 +745,7 @@ this model is **Lab Part 2** — nobody has looked yet.
 | float | `fadd fsub fmul fdiv`, compares, conversions | **4292** |
 | libm `sinf` | `sinf`, kernels, `__kernel_rem_pio2f`, tables | **4742** |
 
-The whole lesson is 27 328 bytes of 32 768. Float and `sinf` together are
+The whole lesson is 27 368 bytes of 32 768. Float and `sinf` together are
 **9 KB — over a quarter of the chip**. On a 32 KB part, flash is a budget like
 cycles are.
 
@@ -1073,7 +1073,7 @@ the same missing DMA. On a Nucleo, the comparison is Lab Part 7.
 
 | Claim | Evidence |
 |---|---|
-| builds, zero warnings, FLASH 27 328 B, RAM 8016 B | the build |
+| builds, zero warnings, FLASH 27 368 B, RAM 8016 B | the build |
 | M4F `vmul.f32`/`vfma.f32` vs M0+ `bl __aeabi_fmul` | **compiled and disassembled** (`fpu_compare`) |
 | every format's accuracy, rounding bias, overflow cases | **measured on the host**, `test_fix`: 15 checks pass |
 | the leaderboard's cycle counts | **host model** of the M0+ running `Main.elf`; 21/22 checksums bit-identical to the PC |

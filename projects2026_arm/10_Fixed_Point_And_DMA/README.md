@@ -44,7 +44,7 @@ skips DMA entirely, should a simulator fault on its registers.
 ## Build and run
 
 ```
-build.bat            # FLASH 27328 B / 32 KB, RAM 8016 B / 12 KB, zero warnings
+build.bat            # FLASH 27368 B / 32 KB, RAM 8016 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat         # after build.bat: accuracy, cycle model, flash costs
 host\fpu_compare.bat # M0+ vs M4F disassembly, compile only
@@ -117,7 +117,7 @@ with the checksum unchanged; symmetry alone, 295.
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 27 328 B, RAM 8016 B (also zero
+- **Builds with zero warnings**: FLASH 27 368 B, RAM 8016 B (also zero
   warnings with `USE_DMA 0`).
 - **Host tests pass**: `test_fix` 15/15; `m0sim` 0 checksum mismatches;
   `fpu_compare` reproduces the slide 2 listings.

@@ -794,7 +794,7 @@ python host/planner.py --compare paths.txt       check every level against astar
 </section>
 <section class="slide">
 <h2>Slide 23: Fitting in 32 KB and 12 KB</h2>
-<p>First build: <strong>34 932 B of flash and 15 136 B of RAM</strong> (counting the linker&#x27;s<br>1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now <strong>29 148 B<br>and 11 336 B</strong>. What got it there, each measured build to build:</p>
+<p>First build: <strong>34 932 B of flash and 15 136 B of RAM</strong> (counting the linker&#x27;s<br>1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now <strong>29 216 B<br>and 11 328 B</strong>. What got it there, each measured build to build:</p>
 <table><thead><tr><th>Change</th><th>Saved</th></tr></thead><tbody><tr><td><code>strtok()</code> → a 12-line <code>split()</code>: newlib&#x27;s strtok mallocs, asserts, and assert prints</td><td>3036 B flash</td></tr><tr><td><code>vprintf</code> → <code>vsnprintf</code> + <code>_write</code>; <code>atoi</code>/<code>strtoul</code> → 10 lines</td><td>917 B flash</td></tr><tr><td>one command dispatcher for typed words <em>and</em> <code>$frames</code></td><td>768 B flash</td></tr><tr><td>fmath&#x27;s inline <code>f_sin</code> etc. called through one out-of-line copy (<code>mathx.c</code>)</td><td>552 B flash</td></tr><tr><td>five task stacks of guessed size → four, sized from Renode&#x27;s high-water marks</td><td>2560 B RAM</td></tr><tr><td>A* 3136 → 2112 B (direction parents, a byte-wide <code>hpos</code>, a measured heap)</td><td>1024 B RAM</td></tr></tbody></table>
 <p>Measured stack use (Renode, after a full run and a <code>dump</code>): world 52 of 96<br>words, robot 174 of 224, ui 216 of 272, shell 254 of 304.</p>
 </section>

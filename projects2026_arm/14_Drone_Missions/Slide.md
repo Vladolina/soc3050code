@@ -1504,7 +1504,7 @@ The first build of this lesson **did not link**: FLASH 30 736 B, RAM
 | `say()` = `vsnprintf` + `_write`, no stdio stream | **1860 B** flash | `printf`/`fputs` to `stdout` drag in buffering, flushing, `malloc` |
 
 *Measured* with this tree's `arm-none-eabi-gcc` by building each variant.
-Final: **FLASH 27 428 B (83.7 %), RAM 10 520 B (85.6 %)**, zero warnings.
+Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings.
 
 The stack sizes come from `-fstack-usage` plus the C library's prologues (the
 `link` task's deepest path, `ml_handle` → `vframe` → `vsnprintf`, is about

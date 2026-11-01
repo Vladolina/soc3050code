@@ -41,7 +41,7 @@ robin — on a PC.
 ## Build and run
 
 ```
-build.bat        # FLASH 27056 B / 32 KB, RAM 9608 B / 12 KB, zero warnings
+build.bat        # FLASH 27124 B / 32 KB, RAM 9608 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat                                        # built-ins + student.c
 host\run.bat host\strategies\alice.c host\strategies\bob.c -- -n 100 --tour alice
@@ -112,7 +112,7 @@ self-outs — his edge-walking idea, measured.
 
 ## Status
 
-**Builds with zero warnings** (FLASH 27 056 B, RAM 9 608 B). The world,
+**Builds with zero warnings** (FLASH 27 124 B, RAM 9 608 B). The world,
 referee, strategies and drawing code are **verified on the host** as above.
 
 **Not yet watched running in Wokwi**, and nothing here has executed on a

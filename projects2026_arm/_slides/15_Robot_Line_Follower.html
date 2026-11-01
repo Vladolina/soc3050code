@@ -449,7 +449,7 @@ void control_step(const sensors_t *in, actuators_t *out);   /* at 100 Hz    */</
 <h2>Slide 4: Five Tasks, Five Rates</h2>
 <table><thead><tr><th>Task</th><th>Prio</th><th>Period</th><th>Job</th><th>Stack (words)</th></tr></thead><tbody><tr><td><code>world</code></td><td>5</td><td>5 ms</td><td><code>world_step()</code> + <code>world_sense()</code></td><td>160</td></tr><tr><td><code>control</code></td><td>4</td><td>10 ms</td><td><code>control_step()</code>, or the joystick in manual</td><td>160</td></tr><tr><td><code>ui</code></td><td>3</td><td>20 ms</td><td><code>pad_read()</code>, buttons, beeps, <code>$LINE</code> at 10 Hz, <code>$LAP</code></td><td>256</td></tr><tr><td><code>shell</code></td><td>2</td><td>on input</td><td><code>kp ki kd df slow thr</code>, <code>noise ambient fail</code>, <code>gains</code>, <code>stats</code></td><td>224</td></tr><tr><td><code>display</code></td><td>1</td><td>100 ms</td><td>the OLED: robot, laps, sensor bar</td><td>256</td></tr></tbody></table>
 <p><strong>Rate-monotonic</strong>: the shorter the period, the higher the priority (lesson<br>07). The world must never be late — a late physics step is a robot that<br>teleports. The display is the opposite: it gets whatever time is left, and<br>the I²C driver is polled, so its flush <em>is</em> CPU time.</p>
-<p>Stacks are sized from <code>gcc -fstack-usage</code> plus newlib&#x27;s printf frames (the<br>deepest chain is <code>send_frame()</code> → <code>vsnprintf()</code> → <code>_svfprintf_r</code>, ~460 bytes),<br>then checked live with <code>stats</code>. The build: <strong>FLASH 26 920 B, RAM 9 352 B</strong>.</p>
+<p>Stacks are sized from <code>gcc -fstack-usage</code> plus newlib&#x27;s printf frames (the<br>deepest chain is <code>send_frame()</code> → <code>vsnprintf()</code> → <code>_svfprintf_r</code>, ~460 bytes),<br>then checked live with <code>stats</code>. The build: <strong>FLASH 26 988 B, RAM 9 352 B</strong>.</p>
 </section>
 <section class="slide">
 <h2>Slide 5: Model 1 — Differential Drive</h2>
@@ -776,7 +776,7 @@ python host\leaderboard.py captures\*.txt</code></pre>
 <section class="slide">
 <h2>Slide 27: What Was Measured — and What Could Not Be</h2>
 <p><strong>Measured on the host</strong> (<code>host/run.bat</code>, exit code 0, all checks pass):<br>every track closes; default gains finish five laps of all four; the speed<br>sweep, P vs PD vs PID, noise vs filter, dead sensors, ambient light; two<br>identical runs give identical results; the OLED frame drawn by the real<br><code>view.c</code>.</p>
-<p><strong>Built for the chip</strong>: zero warnings, FLASH 26 920 B, RAM 9 352 B.</p>
+<p><strong>Built for the chip</strong>: zero warnings, FLASH 26 988 B, RAM 9 352 B.</p>
 <p><strong>Not yet watched running in Wokwi.</strong> What that leaves open:</p>
 <ul><li><strong>Timing.</strong> Does the world step fit its 5 ms on a 48 MHz M0+ with soft float? <code>stats</code> will say. If it does not, every lap time on the chip will differ from the host&#x27;s, because world time is counted in steps.</li><li><strong>The display&#x27;s bus share.</strong> ~500 bytes a frame (measured on the host) at a polled 400 kHz is ~12 ms of CPU every 100 ms, at priority 1 — the bytes are counted, the milliseconds are estimated.</li><li><strong>Stacks.</strong> Sized by analysis; <code>stats</code> prints the real high-water marks.</li></ul>
 </section>

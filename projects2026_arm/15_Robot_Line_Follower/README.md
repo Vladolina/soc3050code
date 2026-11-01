@@ -36,7 +36,7 @@ PC to measure everything this README quotes.
 ## Build and run
 
 ```
-build.bat        # FLASH 26920 B / 32 KB, RAM 9352 B / 12 KB, zero warnings
+build.bat        # FLASH 26988 B / 32 KB, RAM 9352 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
 python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
@@ -98,7 +98,7 @@ world 160, control 160, ui 256, shell 224, display 256 words. **RAM 9 352 B.**
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 26 920 B, RAM 9 352 B.
+- **Builds with zero warnings**: FLASH 26 988 B, RAM 9 352 B.
 - **Host test passes** with the numbers above.
 - **Not yet watched running in Wokwi.** Nothing on the chip side — timing,
   the display, the buttons, the beeps — has been seen. The first three things

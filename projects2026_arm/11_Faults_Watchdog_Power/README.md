@@ -41,7 +41,7 @@ has no `.noinit`; the build engine prefers a lesson's own.
 ## Build and run
 
 ```
-build.bat        # FLASH 25300 B / 32 KB, RAM 5256 B / 12 KB, zero warnings
+build.bat        # FLASH 25340 B / 32 KB, RAM 5256 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # or host/run.sh - after build.bat, so objdump has a Main.elf
 ```
@@ -121,7 +121,7 @@ figure have been built and read, not run.
 
 ## Status
 
-Builds with **zero warnings** (FLASH 25300 B, RAM 5256 B). Host test: 107
+Builds with **zero warnings** (FLASH 25340 B, RAM 5256 B). Host test: 107
 checks pass (numbers above). **Not yet watched running in Wokwi.** The first
 three things to look at when someone does:
 

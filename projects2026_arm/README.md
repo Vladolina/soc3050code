@@ -264,7 +264,7 @@ on both. The course stands alone; it does not depend on SOC4180GH.
 | | 09 | Sensors_And_Buses — ADC, I²C (MPU6050), SPI (MAX7219) ◐ | |
 | 2 Systems | 10 | Fixed_Point_And_DMA — float vs fixed point on a core with no FPU, the M4F's FPU read from a real disassembly, DMA ◐ | C031C6 / Wokwi (app board) |
 | | 11 | Faults_Watchdog_Power — HardFault decoding on ARMv6-M, CFSR as the M4 has it, watchdogs, WFI; HAL vs CMSIS ◐ | |
-| 3 Applications | 12 | Game — SSD1306 engine + arcade ◐ | C031C6 / Wokwi (app board) |
+| 3 Applications | 12 | Game — SSD1306 engine + arcade ✅ watched in Wokwi 2026-11-01 after three Wokwi-only fixes; slide 3b teaches I²C, so it stands without 09–11 | C031C6 / Wokwi (app board) |
 | | 13 | Drone_Attitude — IMU fusion, attitude loops, motor mixing ◐ | simulated inside the firmware |
 | | 14 | Drone_Missions — position hold, missions from Python, failsafes ◐ | |
 | | 15 | Robot_Line_Follower ◐ | |
@@ -370,16 +370,16 @@ every host test passes:
 
 | Lesson | FLASH / RAM | Host test, headline |
 |---|---|---|
-| 10 | 27 328 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
-| 11 | 25 300 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
-| 12 | 15 980 / 4 248 | 20/20; each game played by script; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
-| 13 | 26 224 / 10 848 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
-| 14 | 27 428 / 10 520 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
-| 15 | 26 920 / 9 352 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
-| 16 | 29 148 / 11 336 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
-| 17 | 23 892 / 10 144 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
-| 18 | 27 056 / 9 608 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
-| 19 | 16 576 / 10 280 | 15/15; the template's health and watchdog logic |
+| 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
+| 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
+| 12 | 16 056 / 4 248 | 20/20; each game played by script; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
+| 13 | 26 292 / 10 848 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
+| 14 | 27 496 / 10 520 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
+| 15 | 26 988 / 9 352 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
+| 16 | 29 216 / 11 328 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
+| 17 | 23 960 / 10 144 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
+| 18 | 27 124 / 9 608 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
+| 19 | 16 648 / 10 280 | 15/15; the template's health and watchdog logic |
 
 **Wokwi does not implement DMA, IWDG, PWR or RTC** on this board, and WWDG is
 "implemented, not tested" ([Wokwi's board page](https://docs.wokwi.com/parts/board-st-nucleo-c031c6)).

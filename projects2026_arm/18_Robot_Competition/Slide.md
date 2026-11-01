@@ -822,7 +822,8 @@ and worst `match_step()` in cycles. That is Lab Part 1's first number.
 |---|---|---|
 | first draft, shell parsed with `sscanf()` | 30 068 B | 92 % — over the 29 KB line |
 | `sscanf()` replaced by an 11-line `number()` | 27 392 B | |
-| `fmath.h`'s `f_sin`/`f_cos` called through one out-of-line copy | **27 056 B** | 83 % |
+| `fmath.h`'s `f_sin`/`f_cos` called through one out-of-line copy | 27 056 B | 83 % |
+| `i2c.c` and `beep.c` fixed for Wokwi (lesson 12, 2026-11-01) | **27 124 B** | 83 % |
 
 `sscanf` dragged in `_scanf_i`, `__ssvfscanf_r` and `strtol`/`strtoul` —
 **2.7 KB for parsing two numbers**. `fmath.h`'s functions are `static inline`,

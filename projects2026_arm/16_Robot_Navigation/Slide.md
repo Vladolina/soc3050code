@@ -914,8 +914,8 @@ tearing the result (lesson 03). It wraps every 89 s; differences do not care.
 ## Slide 23: Fitting in 32 KB and 12 KB
 
 First build: **34 932 B of flash and 15 136 B of RAM** (counting the linker's
-1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now **29 148 B
-and 11 336 B**. What got it there, each measured build to build:
+1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now **29 216 B
+and 11 328 B**. What got it there, each measured build to build:
 
 | Change | Saved |
 |---|---|

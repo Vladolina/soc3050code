@@ -403,7 +403,7 @@ the I²C driver is polled, so its flush *is* CPU time.
 
 Stacks are sized from `gcc -fstack-usage` plus newlib's printf frames (the
 deepest chain is `send_frame()` → `vsnprintf()` → `_svfprintf_r`, ~460 bytes),
-then checked live with `stats`. The build: **FLASH 26 920 B, RAM 9 352 B**.
+then checked live with `stats`. The build: **FLASH 26 988 B, RAM 9 352 B**.
 
 ---
 
@@ -918,7 +918,7 @@ sweep, P vs PD vs PID, noise vs filter, dead sensors, ambient light; two
 identical runs give identical results; the OLED frame drawn by the real
 `view.c`.
 
-**Built for the chip**: zero warnings, FLASH 26 920 B, RAM 9 352 B.
+**Built for the chip**: zero warnings, FLASH 26 988 B, RAM 9 352 B.
 
 **Not yet watched running in Wokwi.** What that leaves open:
 

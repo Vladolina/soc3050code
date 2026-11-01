@@ -40,7 +40,7 @@ frames go to lesson 08's `host.py`.
 ## Build and run
 
 ```
-build.bat        # FLASH 23892 B / 32 KB, RAM 10144 B / 12 KB, zero warnings
+build.bat        # FLASH 23960 B / 32 KB, RAM 10144 B / 12 KB, zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf
 host\run.bat     # or: bash host/run.sh  - exits 0, "all checks passed"
 python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
@@ -103,7 +103,7 @@ high-water marks, I²C timing — and anything about Wokwi.
 
 ## Status
 
-Builds with **zero warnings** (FLASH 23 892 B, RAM 10 144 B). The host
+Builds with **zero warnings** (FLASH 23 960 B, RAM 10 144 B). The host
 verification passes and its numbers are quoted above and in the deck, each
 labelled *measured on the host*.
 

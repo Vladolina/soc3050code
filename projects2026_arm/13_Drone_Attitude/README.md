@@ -42,7 +42,7 @@ and Slide 22 measures what it costs.
 ## Build and run
 
 ```
-build.bat          # FLASH 26224 B / 32 KB, RAM 10848 B / 12 KB, zero warnings
+build.bat          # FLASH 26292 B / 32 KB, RAM 10848 B / 12 KB, zero warnings
 host\run.bat       # PASSED: 0 of 24 checks failed
 python host\cycles.py         # needs Main.elf; about 35 s
 simulate.bat
@@ -128,7 +128,7 @@ now taught:**
 
 ## Status
 
-Builds with **zero warnings** (FLASH 26 224 B, RAM 10 848 B). `host/run.bat`
+Builds with **zero warnings** (FLASH 26 292 B, RAM 10 848 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
 **Not yet watched running in Wokwi.** Nothing on the OLED, no button, no

@@ -38,7 +38,7 @@ Zero warnings, and:
 
 ```
 Building 10_Fixed_Point_And_DMA  [target c031c6] ...
-           FLASH:       27328 B        32 KB     83.40%
+           FLASH:       27368 B        32 KB     83.52%
              RAM:        8016 B        12 KB     65.23%
 ```
 

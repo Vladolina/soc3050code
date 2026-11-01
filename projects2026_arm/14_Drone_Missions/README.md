@@ -44,7 +44,7 @@ waypoints, altitude, battery, wind.
 ## Build and run
 
 ```
-build.bat        # FLASH 27428 B / 32 KB (83.7 %), RAM 10520 B / 12 KB (85.6 %), zero warnings
+build.bat        # FLASH 27496 B / 32 KB (83.9 %), RAM 10520 B / 12 KB (85.6 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
 python host\mission.py host\default.mission          # frames to type/paste into Wokwi
@@ -112,7 +112,7 @@ reports `LANDED` — it cannot tell a crash from a landing.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 27 428 B, RAM 10 520 B.
+- Builds with **zero warnings**: FLASH 27 496 B, RAM 10 520 B.
 - Host tests: **all pass** (above).
 - **Not yet watched running in Wokwi.** Nothing in this lesson has run on the
   simulated chip. When someone does, look first at:

@@ -782,7 +782,7 @@ From this lesson's build — `arm-none-eabi-size -A Main.elf` and `nm --size-sor
 
 | Item | Bytes | |
 |---|---|---|
-| **FLASH total** | **16 576** | of 32 768 (50.6 %) |
+| **FLASH total** | **16 648** | of 32 768 (50.8 %) |
 | **RAM total** | **10 280** | of 12 288 (83.7 %) |
 | six task stacks | 6 016 | 160 + 256 + 288 + 224 + 256 + 320 words |
 | idle stack | 256 | the kernel's |
@@ -961,7 +961,7 @@ year's project, with or without AI in between.
 
 | Claim | Evidence |
 |---|---|
-| builds with zero warnings, 16 576 B flash, 10 280 B RAM | this lesson's build |
+| builds with zero warnings, 16 648 B flash, 10 280 B RAM | this lesson's build |
 | app logic: speeds, friction stop, fuzz, determinism, bot score | **measured on the host** — slide 21 |
 | health logic: missing bitmap, starve and force times | **measured on the host** — `[8]` |
 | frame cost 1088 B | **measured on the host** — byte count through the real `oled.c` |
