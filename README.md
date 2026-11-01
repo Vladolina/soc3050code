@@ -14,18 +14,30 @@ watchdogs; and lessons 12–19, which turn the same C into an arcade game, two
 simulated drones, four simulated robots and a final project. They build with
 the vendored `tools/arm-toolchain/` and run in the browser on Wokwi's
 Nucleo-C031C6. Lessons 10–19 are verified by host tests of their pure-C logic;
-05–19 are not yet watched running in Wokwi. The AVR tree is still the larger
-body of lessons watched running in a simulator.
+of 05–19, only 06 and 12 have yet been watched running in Wokwi. The AVR tree
+is still the larger body of lessons watched running in a simulator.
 
 ---
 
 ## Quick start
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/gnoejh/soc3050code.git
 cd soc3050code
 code .
 ```
+
+**Clone into a short folder** such as `C:\work\` or `Documents\`. The
+vendored SimulIDE carries paths up to 172 characters, and Windows' default
+260-character limit leaves about 85 for the folder you clone into. Past that,
+git prints `Filename too long`, says *"Clone succeeded, but checkout failed"*,
+and the clone is unusable. If you must clone deep, enable long paths first:
+
+```bash
+git config --global core.longpaths true
+```
+
+Nothing else needs installing: both compilers and SimulIDE are in `tools/`.
 
 Then open any file under `projects2026_avr/01_Port_Basic/` and press
 **Ctrl+Shift+B** to build, or run **Terminal → Run Task → Simulate Current
