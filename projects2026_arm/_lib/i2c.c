@@ -73,6 +73,22 @@ static int finish(int result)
     return result;
 }
 
+/* Every transaction starts from a freshly reset I2C block: PE low resets the
+ * state machine and its flags (TIMINGR and the rest of CR1 are kept).  A real
+ * chip does not need it - between transactions TXIS is clear - but Wokwi
+ * raises TXIS again a little after the STOP (seen 2026-11-01), and a stale
+ * TXIS makes the next transfer write byte 1 before the address has gone out:
+ * the count is off by one, the transfer hangs, and the OLED stayed black.
+ * It also recovers a block left mid-transfer by a timeout.  RM0490: PE must
+ * stay low for 3 APB clocks; the read-backs give more than that. */
+static void begin(void)
+{
+    I2C1->CR1 &= ~I2C_CR1_PE;
+    while (I2C1->CR1 & I2C_CR1_PE) { }
+    (void)I2C1->CR1; (void)I2C1->CR1;
+    I2C1->CR1 |= I2C_CR1_PE;
+}
+
 static uint32_t cr2(uint8_t addr, size_t n, uint32_t flags)
 {
     return ((uint32_t)addr << 1)                         /* 7-bit address in SADD[7:1] */
@@ -83,6 +99,7 @@ static uint32_t cr2(uint8_t addr, size_t n, uint32_t flags)
 int i2c_write_read(uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t rn)
 {
     int rc;
+    begin();
     if (wn > 0) {
         /* AUTOEND only if nothing is read afterwards: otherwise stop at TC and
          * turn the bus around with a repeated START - no STOP in between, so
@@ -107,6 +124,7 @@ int i2c_write_read(uint8_t addr, const uint8_t *w, size_t wn, uint8_t *r, size_t
  * The whole of an I2C bus scan. */
 int i2c_probe(uint8_t addr)
 {
+    begin();
     I2C1->CR2 = cr2(addr, 0, I2C_CR2_AUTOEND);
     return finish(wait_for(I2C_ISR_STOPF));
 }

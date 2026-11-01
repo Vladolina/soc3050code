@@ -1405,6 +1405,7 @@ arcade_draw();                /* RENDER: once, however many updates ran */
 if (full_repaint) { oled_invalidate(); }
 oled_flush();</code></pre>
 <p>A slow frame does not slow the game; it makes the <em>next</em> frame run two updates.<br><strong>Game speed is set by <code>next += TICK_MS</code>, picture smoothness by how long a<br>render takes</strong> — two different numbers, deliberately decoupled.</p>
+<p><strong>In Wokwi, <code>Main.c</code> spins instead of <code>__WFI()</code></strong> (<code>SLEEP_WFI 0</code>): with no<br>timer running, Wokwi&#x27;s <code>WFI</code> never woke and the board froze after the banner.<br>The game behaves the same either way; on silicon <code>WFI</code> stops the core clock<br>between ticks and saves current (lesson 11).</p>
 </section>
 <section class="slide">
 <h2>Slide 13: Why a Fixed Step — and the Spiral of Death</h2>

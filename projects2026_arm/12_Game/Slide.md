@@ -832,6 +832,11 @@ A slow frame does not slow the game; it makes the *next* frame run two updates.
 **Game speed is set by `next += TICK_MS`, picture smoothness by how long a
 render takes** — two different numbers, deliberately decoupled.
 
+**In Wokwi, `Main.c` spins instead of `__WFI()`** (`SLEEP_WFI 0`): with no
+timer running, Wokwi's `WFI` never woke and the board froze after the banner.
+The game behaves the same either way; on silicon `WFI` stops the core clock
+between ticks and saves current (lesson 11).
+
 ---
 
 ## Slide 13: Why a Fixed Step — and the Spiral of Death

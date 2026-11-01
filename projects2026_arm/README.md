@@ -391,7 +391,30 @@ Lesson 10 detects a DMA channel that never moves and falls back to polled
 reads, saying which path ran. Lessons 11 and 19 keep the real IWDG code for
 silicon and add a software watchdog the simulator can show.
 
-**Not yet watched in Wokwi — any of 10–19.** Each README's Status section
+**Three more Wokwi behaviours, found getting lesson 12 to run (2026-11-01),**
+each measured on serial output, none on Wokwi's page:
+
+- **I2C leaves TXIS set after a STOP** (`ISR = 0x23` once a write ends). The
+  next transfer's first wait for TXIS passed at once, byte 1 went out before
+  the address, the byte count was off by one, and the transfer hung - the
+  OLED stayed black and every flush timed out. `i2c.c` (shared and lesson
+  09's copy) now resets the block with PE before every transaction. It also
+  ignores TIMINGR's PRESC/SCLDEL/SDADEL (reads back `0x273D`): a 129-byte page
+  takes 12.5 ms, about 100 kHz, not 400.
+- **A timer left counting starves the CPU.** `beep.c` kept TIM3 running at
+  1 MHz with 0% duty between notes; lesson 12's loop then ran ~800x slower
+  than the same code before `beep_init()` (96 ms per `pad_read()`), and every
+  button press fell between two reads. TIM3 now stops between notes.
+- **`WFI` with no timer running never wakes** - the board froze right after
+  the banner once TIM3 stopped. Lesson 12's idle loop spins to the next tick
+  (`SLEEP_WFI 0`); lesson 11 has the same kind of switch.
+
+Also: Wokwi's CPU is several times slower than 48 MHz against its own
+SysTick (100 000 empty loop passes: 200 ms), so per-pixel code costs more
+there than on silicon - a full menu redraw takes 40 ms.
+
+**Watched in Wokwi: 12** (2026-11-01, menu, start, stick, sound).
+**Not yet watched — 10, 11, 13–19.** Each README's Status section
 lists the first three things to look at. The largest open questions are
 on-chip ones a PC cannot answer: real cycles per control step, task stack
 high-water marks (every lesson prints them on `stats`), and whether lesson

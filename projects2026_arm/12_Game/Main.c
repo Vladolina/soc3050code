@@ -40,6 +40,13 @@
 #define BAUD         115200u
 #define MAX_CATCHUP  4               /* at most 4 updates (80 ms) per frame */
 
+/* SLEEP_WFI 1: the idle loop sleeps in WFI until SysTick wakes it - what
+ * silicon should do.  0: it spins until the tick instead.  Wokwi needs 0:
+ * with WFI and no timer running, its SysTick never woke the core and the
+ * board froze right after the banner (2026-11-01).  Same behaviour either
+ * way; only the current drawn on real hardware differs (lesson 11). */
+#define SLEEP_WFI    0
+
 /* ============================================================================
  *  Time: SysTick at 1 kHz, and a microsecond stopwatch from the same counter
  * ============================================================================
@@ -181,7 +188,12 @@ int main(void)
             }
         }
         if (ran == 0) {               /* nothing due: sleep until the next tick */
+#if SLEEP_WFI
             __WFI();
+#else
+            uint32_t m = ms;
+            while (ms == m) { }       /* Wokwi: spin to the tick (see SLEEP_WFI) */
+#endif
             continue;
         }
 

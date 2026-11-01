@@ -38,7 +38,7 @@ a PC with scripted joysticks.
 ## Build and run
 
 ```
-build.bat        # FLASH 15980 B / 32 KB, RAM 4248 B / 12 KB, zero warnings
+build.bat        # FLASH 16056 B / 32 KB, RAM 4248 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # or: bash host/run.sh  - plain gcc, no board needed
 ```
@@ -269,21 +269,26 @@ The menu:
 
 ## Status
 
-**Builds with zero warnings** (FLASH 15 980 B, RAM 4 248 B). **The host test
-passes all 20 checks** with the numbers above. Nothing here has been run on
-silicon, in Renode or in Wokwi.
+**Builds with zero warnings** (FLASH 16 056 B, RAM 4 248 B). **The host test
+passes all 20 checks** with the numbers above. Not run on silicon or in Renode.
 
-**Not yet watched running in Wokwi.** When someone does, the first three
-things to look at:
+**Watched running in Wokwi on 2026-11-01**: the menu shows, A starts a game,
+the stick moves the selection, sound plays. Getting there took three fixes,
+each found from serial output (details in the ARM README, "Wokwi does not
+implement"):
 
-1. **Does the OLED show the menu?** The banner's OLED line must say
-   *initialised*; then the screen must not stay dark. A dark screen with an OK
-   banner points at the init sequence (`8D 14`, the charge pump) or at Wokwi
-   rejecting a 129-byte data transfer.
-2. **The first `$PERF` lines in SNAKE**, `DIRTY` then `FULL` (stick press):
-   the host predicts ~50 / 50 fps/ups and ~3 ms flush dirty, ~40 / 50 and
-   ~25 ms full. `ups` must stay 50; the real `flush_us` for a full frame is the
-   measurement this lesson exists to make.
-3. **The controls**: does the stick's HORZ run the right way (right = right
-   after `pad.c`'s flip), and do the `a`/`b` keys reach the buttons while the
-   joystick has focus? FLAP is only playable if they do.
+1. **Black screen.** Wokwi's I2C leaves TXIS set after a STOP, so the second
+   transfer of `oled_init()` hung. `_lib/i2c.c` now resets the block before
+   every transaction.
+2. **2 fps, buttons and stick ignored, no sound.** `beep_init()` left TIM3
+   counting at 1 MHz between notes, which starved Wokwi's CPU (~800x).
+   `_lib/beep.c` now stops the timer between notes.
+3. **Frozen after the banner** once TIM3 stopped: Wokwi's `WFI` never woke.
+   `SLEEP_WFI 0` at the top of `Main.c` spins to the next tick instead; set it
+   to 1 on a real board. Slide 12's listing shows the `WFI` form.
+
+**Still to measure in Wokwi**: the `$PERF` figures against the host's
+prediction (~50 fps dirty, full-frame `flush_us`). A full repaint measured
+106 ms there - I2C runs at ~100 kHz in Wokwi whatever `TIMINGR` says - so
+`FULL` mode will not reach 50 fps in the simulator. Also whether the stick's
+HORZ runs the right way in BREAKOUT.
