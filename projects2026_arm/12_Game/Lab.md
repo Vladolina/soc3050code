@@ -11,7 +11,7 @@
 
 ## What this lab is
 
-**A guided walkthrough, not a test — and an arcade.** You will play three
+**A guided walkthrough, not a test — and an arcade.** You will play five
 games, then take the engine under them apart: measure what the display costs,
 break the trick that makes it cheap, draw a sprite, tune a difficulty curve,
 and finish with a class high-score table and a game of your own.
@@ -27,9 +27,9 @@ Two tools do the measuring:
   needs only `gcc`. Everything it prints was measured; the numbers quoted
   below as "the host says" come from it.
 
-**Nobody has yet watched this firmware run in Wokwi.** Where this handout says
-what the *board* will show, it is a prediction from the host model — say
-whether it came true.
+**The first three games were watched running in Wokwi (2026-11-01); DOOM and
+PRINCE have not been.** Where this handout says what the *board* will show, it
+is a prediction from the host model — say whether it came true.
 
 Each part says **Do this**, asks you to **guess**, then explains **what you see
 and why**. Nothing is marked or collected. **Put every change back before the
@@ -46,12 +46,18 @@ build.bat
 simulate.bat
 ```
 
-Zero warnings, and:
+Zero warnings, and about:
 
 ```
-           FLASH:       16056 B        32 KB     49.00%
-             RAM:        4248 B        12 KB     34.57%
+           FLASH:      ~27000 B        32 KB     ~82%
+             RAM:        5400 B        12 KB     43.95%
 ```
+
+FLASH depends on the compiler. The vendored gcc 15.2 built the three-game
+arcade at 16 056 B, and DOOM and PRINCE added 10 832 B under gcc 13.2 — so
+expect about 27 000 B; that sum is an estimate, not a measurement, so **write
+down what yours prints**. RAM is the same on both compilers (4 248 B before the
+two new games, 5 400 B after).
 
 Paste `diagram.json` into Wokwi (**required** — the OLED, joystick, buttons,
 knob and buzzer all live there), then `F1` → **Upload Firmware and Start
@@ -94,9 +100,15 @@ The host test's autopilots set the bar, at level 3:
 | SNAKE | **126** (42 apples) | flood fill + shortest path |
 | BREAKOUT | **1 395** in 5 min, never misses | predicts where the ball lands |
 | FLAP | **97** pipes | flaps when its feet near the gap's bottom |
+| DOOM | **10 waves, 44 kills** in 5 min, hurt 5 times | breadth-first route to the exit, shoots whatever the ray walk says it sees |
+| PRINCE | **11 laps** of the level in 2 min, never hurt | looks one tile ahead: jumps holes and spikes, climbs ledges, parries the blade |
 
 **Guess first:** which one can a human beat?
 
+> (DOOM and PRINCE: nobody has tried yet. Their autopilots see exact positions
+> and never mistime a parry, so the bar to beat is the lap — about 29 s a wave in
+> DOOM, 11 s a lap in PRINCE — not survival.)
+>
 > SNAKE, probably: its autopilot is greedy and boxes itself in. BREAKOUT's
 > autopilot knows the ball's velocity exactly and never misses, so only its
 > *score rate* is beatable — by aiming at the top rows, which pay 4× level per
@@ -282,6 +294,24 @@ to be sure nothing else broke.
 > human is not. Game studios use bots exactly this way: not to find the right
 > difficulty, but to see the shape of the curve and find the cliffs.
 
+**The second table.** `--playtest` goes on to DOOM and PRINCE, whose autopilots
+aim and parry perfectly and so *cannot tell the levels apart* (44 kills at every
+level; never hurt). Each game therefore also gets a handicapped player:
+
+```
+  level | DOOM autopilot: kills waves | pacifist lasts | PRINCE autopilot: laps | never-parry: hearts lost per duel
+    1   |            44.0   10.3 |        19.5 s  |             13.0       |                   1.76
+    2   |            44.3   10.3 |        16.9 s  |             12.3       |                   2.31
+    3   |            44.3   10.3 |        14.9 s  |             11.0       |                   3.36
+    4   |            44.3   10.7 |        13.4 s  |             10.0       |                   3.71
+    5   |            44.3   10.7 |        12.6 s  |              9.0       |                   4.20
+```
+
+DOOM's pacifist (walks the route, never fires) lives 19.5 s at level 1 and
+12.6 s at level 5; PRINCE's never-parry prince loses more hearts per duel at
+every level. Both are *monotone*, which is what a difficulty curve should be —
+and PRINCE's was not until two bugs were fixed (Part 7b, task 3).
+
 ---
 
 ## Part 7 — The class high-score table (15 min)
@@ -316,15 +346,99 @@ python host\leaderboard.py scores\*.txt
 
 ---
 
+## Part 7b — The two big games (25 min, on the host)
+
+DOOM and PRINCE are the same engine given harder problems. They are pure C like
+the rest, so everything here runs with `gcc` and no board.
+
+### 1. Where did the dirty pages go? (5 min)
+
+**Do this:** run `host\run.bat` and find the bus table. SNAKE sends 129 B a
+frame, PRINCE 432 B, DOOM 912 B.
+
+**Guess first:** all three run at 50 updates a second. Which does `oled.c`'s
+dirty-page trick help most, and which hardly at all?
+
+> SNAKE most (12 % of a full repaint's bytes) and DOOM least (83 %). A first-person view changes
+> nearly every pixel of every page the moment you move, so there is nothing
+> unchanged to skip; and 71 % of DOOM's frames need more than the 20 ms tick
+> on the bus alone. The loop still keeps 50 updates a second (slide 12) and the
+> host's bus-only model draws 47.5 frames. **The CPU's share is not in that
+> number**: DOOM writes 7 040 pixels a frame before the bus starts, so compare
+> `$PERF`'s `busy %` for DOOM and SNAKE on the board.
+>
+> **In Wokwi, expect about 88 ms a DOOM frame** (a full repaint took 106 ms
+> there; DOOM sends 912 B of 1 104): roughly 11 frames a second, and the game
+> itself running a little slow once a frame passes 80 ms. A prediction — write
+> down what you see.
+
+### 2. Change the field of view (10 min)
+
+**Do this:** the DOOM screenshot is taken at tick 766, with the imp dead ahead.
+In `host/test_games.c` change that `766` (in the `run(&game_doom, ...)` line) to
+`194` — an imp off to one side — run `host\run.bat`, and keep a copy of
+`host\out\doom.txt`. Now in `doom.c` change `PLANE` from 169 to 256 (a 90° view
+instead of 66°), run again, and compare the two pictures.
+
+**Guess first:** how many of the 48 checks fail?
+
+> **None.** The walls come out right, but a monster off to one side is drawn in
+> the wrong column, because two numbers depend on the camera plane: `PLANE`,
+> and the **97** in `draw_things()` (= 64 ÷ 0.66, columns of screen per unit of
+> sideways-over-distance). With a 90° view the factor must be 64: a monster whose
+> sideways offset is a third of its distance belongs **21 px** right of centre,
+> and the stale 97 puts it 32 px right. Change 97 to 64 and the host test still
+> passes — and now the picture is right too.
+>
+> The host test cannot see this: the pistol aims along the *centre* ray, which
+> does not depend on the plane at all. A bug that the checks are blind to can
+> only be found by looking, which is why the test writes pictures.
+
+### 3. Parry, or don't (10 min)
+
+**Do this:** `host\out\test_games.exe --playtest`, and read the last column of
+the second table.
+
+**Guess first:** why does a prince who never parries lose more hearts per duel
+at every higher level, when the autopilot that parries loses none?
+
+> Three numbers in `guard_think()` make a level: the pause between attacks
+> (`56 - 8 * level`: 48 ticks at level 1, 20 at level 5), the guard's health
+> (`2 + (level + 1) / 2`) and a flat 30 % chance to block. The curve climbs —
+> **1.76, 2.31, 3.36, 3.71, 4.20** — only because the prince's grace after a
+> blow, `hurt_t = 16` in `hurt()`, is *shorter than the shortest pause*.
+>
+> **Try it:** set `hurt_t = 30` and re-run. Level 4 falls from 3.71 to **2.38**,
+> below level 3's 3.36: at levels 4 and 5 every second blade now lands inside
+> the grace and is swallowed. (An earlier draft had a worse flaw: a landed blow
+> cancelled the guard's raised blade, so tapping A every ten ticks locked him
+> out of attacking and parrying was optional.) Put `hurt_t` back to 16.
+
+### 4. Make the tiles page-aligned (optional, 15 min)
+
+**Guess first:** PRINCE sends 432 B a frame. A figure 15 px tall in a world of
+18 px rows always straddles three 8-row pages (3 × 129 = 387 B). If the rows
+were 16 px and started on a page boundary, how many bytes would a moving figure
+cost?
+
+> Two pages — **258 B**, about 6 ms of bus instead of 9. Doing it means `TH =
+> 16`, `SY0 = 16`, a one-row slab, and every literal `15` and `18` in
+> `prince.c` that is really "the slab" or "a row" — a good half hour, and
+> `host/test_games.c` will tell you whether you broke a rule. Measure bytes per
+> frame before and after.
+
+---
+
 ## Part 8 — Your turn (open-ended)
 
 Pick one. Whatever you build, **add a check to `host/test_games.c`** that
 fails if it breaks — the arcade's rule is that a game is not done until the
 host test can play it.
 
-- **A fourth game.** `game_t` is five function pointers; add yours to the
-  `games[]` array in `arcade.c` and the menu shows it (move the SPEED row down,
-  or make the menu scroll). Ideas that suit a 128 × 64 screen and a stick:
+- **A sixth game.** `game_t` is five function pointers; add yours to the
+  `games[]` array in `arcade.c`. The menu is full — five rows of 9 px and the
+  SPEED row fill the screen — so make it scroll. Flash is the other limit: the
+  five games leave about 2.7 KB under gcc 13 (slide 28). Ideas that suit a 128 × 64 screen and a stick:
   **PONG** against a CPU paddle that tracks the ball with a speed limit (the
   speed limit *is* the difficulty); a **space dodger** — stick up and down,
   rocks scroll in from the right, AABB against each; **TRON** light-cycles

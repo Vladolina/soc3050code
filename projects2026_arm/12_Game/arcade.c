@@ -14,7 +14,7 @@
 #include "arcade.h"
 #include "proto.h"
 
-static const game_t *const games[] = { &game_snake, &game_breakout, &game_flap };
+static const game_t *const games[] = { &game_snake, &game_breakout, &game_flap, &game_doom, &game_prince };
 #define NGAMES ((int)(sizeof games / sizeof games[0]))
 
 #define OVER_HOLD  (TICK_HZ * 3 / 4)    /* ignore buttons for 0.75 s after death */
@@ -103,21 +103,21 @@ static void draw_menu(void)
     oled_clear();
     text_center(0, "SOC3050 ARCADE", OLED_ON);
     oled_hline(0, 8, OLED_W, OLED_ON);
-    for (int g = 0; g < NGAMES; g++) {
-        int y = 12 + g * 11;
+    for (int g = 0; g < NGAMES; g++) {                 /* 5 rows of 9: 11, 20, 29, 38, 47 */
+        int y = 11 + g * 9;
         char hi[16];
         snprintf(hi, sizeof hi, "HI %ld", (long)high[g]);
-        if (g == sel) { oled_fill_rect(2, y - 2, OLED_W - 4, 11, OLED_ON); }
+        if (g == sel) { oled_fill_rect(2, y - 1, OLED_W - 4, 9, OLED_ON); }
         int c = (g == sel) ? OLED_XOR : OLED_ON;       /* inverted when chosen */
         oled_text(8, y, games[g]->name, c);
         oled_text(OLED_W - 8 - 6 * (int)strlen(hi), y, hi, c);
     }
-    oled_text(8, 46, "SPEED", OLED_ON);
+    oled_text(2, 56, "SPEED", OLED_ON);
     for (int i = 0; i < 5; i++) {                     /* the knob, as 5 boxes */
-        if (i < level) { oled_fill_rect(44 + i * 9, 46, 7, 7, OLED_ON); }
-        else           { oled_rect(44 + i * 9, 46, 7, 7, OLED_ON); }
+        if (i < level) { oled_fill_rect(36 + i * 8, 56, 6, 7, OLED_ON); }
+        else           { oled_rect(36 + i * 8, 56, 6, 7, OLED_ON); }
     }
-    text_center(56, "A:PLAY  STICK:PICK", OLED_ON);
+    oled_text(OLED_W - 2 - 6 * 6 + 1, 56, "A:PLAY", OLED_ON);   /* stick: pick; A: play */
 }
 
 int score_frame(char *out, size_t n, const char *game, int32_t score)

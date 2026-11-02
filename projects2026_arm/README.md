@@ -35,7 +35,7 @@ _notebooks/               the Colab workbench, one notebook for the course
 09_Sensors_And_Buses/     Part 1 - ADC, I2C (MPU6050), SPI (MAX7219)
 10_Fixed_Point_And_DMA/   Part 2 - a benchmark arena: float vs Q15/Q16 vs int; DMA ADC scan
 11_Faults_Watchdog_Power/ Part 2 - the crash lab: HardFault decoding, watchdogs, WFI
-12_Game/                  Part 3 - an arcade on the OLED: Snake, Breakout, Flap
+12_Game/                  Part 3 - an arcade on the OLED: Snake, Breakout, Flap, Doom (a raycaster), Prince (a tile platformer)
 13_Drone_Attitude/        Part 3 - a simulated quadcopter: IMU fusion, cascaded PID, mixer
 14_Drone_Missions/        Part 3 - position hold, waypoint missions from Python, failsafes
 15_Robot_Line_Follower/   Part 3 - PID line following on four tracks, lap leaderboard
@@ -372,7 +372,7 @@ every host test passes:
 |---|---|---|
 | 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
 | 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
-| 12 | 16 056 / 4 248 | 20/20; each game played by script; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
+| 12 | 16 056 / 4 248 (3 games, gcc 15.2); **30 052 / 5 400** with Doom and Prince added (5 games, gcc 13.2 — the vendored compiler was not run) | 20/20, now **48/48**; each game played by script; Snake costs 129 bus bytes a frame against 1104 for a full repaint, Doom 912, Prince 432. Doom and Prince are not yet watched in Wokwi |
 | 13 | 26 292 / 10 848 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
 | 14 | 27 496 / 10 520 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
 | 15 | 26 988 / 9 352 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |

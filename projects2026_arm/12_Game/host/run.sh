@@ -6,6 +6,6 @@ set -e
 cd "$(dirname "$0")"
 mkdir -p out
 gcc -std=c11 -O2 -Wall -Wextra -I.. -I../../_lib -o out/test_games \
-    test_games.c ../engine.c ../arcade.c ../snake.c ../breakout.c ../flappy.c \
+    test_games.c ../engine.c ../arcade.c ../snake.c ../breakout.c ../flappy.c ../doom.c ../prince.c \
     ../../_lib/oled.c ../../_lib/proto.c
 ./out/test_games

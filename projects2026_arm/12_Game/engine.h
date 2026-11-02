@@ -38,11 +38,13 @@ typedef struct {
     int32_t (*score)(void);
 } game_t;
 
-extern const game_t game_snake, game_breakout, game_flap;
+extern const game_t game_snake, game_breakout, game_flap, game_doom, game_prince;
 
 /* ---- sound: the one hook to the platform -------------------------------- */
 enum { SFX_MOVE, SFX_SELECT, SFX_START, SFX_EAT, SFX_BOUNCE, SFX_BRICK,
-       SFX_FLAP, SFX_POINT, SFX_LOSE, SFX_LEVEL, SFX_OVER, SFX_HIGH, SFX_COUNT };
+       SFX_FLAP, SFX_POINT, SFX_LOSE, SFX_LEVEL, SFX_OVER, SFX_HIGH,
+       SFX_SHOT, SFX_HIT, SFX_HURT, SFX_DOOR, SFX_SWORD, SFX_THUD,   /* DOOM, PRINCE */
+       SFX_COUNT };
 void sfx(int id);                     /* Main.c on the board; the test on a PC */
 
 /* ---- a tiny deterministic random number generator ----------------------- */
@@ -77,5 +79,28 @@ void snake_peek(peek_t *p);
 int  snake_cell_free(int cx, int cy);     /* inside the walls and not snake */
 void breakout_peek(peek_t *p);
 void flap_peek(peek_t *p);
+
+/* DOOM: x, y = the player in Q8 cells, vx, vy = the way it faces (Q8 unit
+ * vector), w = waves cleared, h = monsters alive, count = kills, lives =
+ * health, gap = ammunition.  The rest are for an autopilot that has to find
+ * its way: the map's cells, the things in it, and a line-of-sight test. */
+void doom_peek(peek_t *p);
+int  doom_cell(int cx, int cy);                   /* the map char there        */
+int  doom_thing(int i, int *x, int *y);           /* -1 no more, 0 gone, 1+type: 1 zombie 2 imp 3 ammo 4 health */
+int  doom_los(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
+
+/* PRINCE: x, y = the prince's centre and feet in world pixels, vx, vy = his
+ * speed (Q4), w = the awake guard's distance in px (999 if none), h = the
+ * guard's health, count = the prince's room (0..5), lives = his health, tx =
+ * which way he faces (+1 right).  gap = his state:
+ *     0 standing  1 running  2 jumping  3 falling  4 hanging  5 climbing
+ *     6 en garde  7 striking  8 parrying  9 dead
+ * and ty = the guard's state: 0 asleep  1 fighting  2 striking  3 blocking
+ * 4 dead.  prince_tile() is the world's char at a tile (col, row); a tile
+ * is '.' air, '#' block, anything else has a floor slab.  prince_fall_cost()
+ * is the rule for landing: hearts lost for a drop of `rows` rows, 99 = dead. */
+void prince_peek(peek_t *p);
+int  prince_tile(int tx, int ty);
+int  prince_fall_cost(int rows);
 
 #endif

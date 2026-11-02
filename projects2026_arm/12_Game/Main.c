@@ -2,12 +2,12 @@
  * Main.c - SOC3050 lesson 12: Game
  *          ST Nucleo-C031C6, STM32C031C6, Cortex-M0+ at 48 MHz
  *
- * An arcade: SNAKE, BREAKOUT and FLAP on a 128x64 SSD1306 OLED, a joystick,
- * buttons A and B, a knob for the speed, and a buzzer.
+ * An arcade: SNAKE, BREAKOUT, FLAP, DOOM and PRINCE on a 128x64 SSD1306 OLED,
+ * a joystick, buttons A and B, a knob for the speed, and a buzzer.
  *
  * This file is the PLATFORM - the only one that knows it is on a chip.  The
- * games (snake.c, breakout.c, flappy.c), the engine (engine.c) and the menu
- * (arcade.c) are pure C and run unchanged on a PC in host/test_games.c.
+ * games (snake.c, breakout.c, flappy.c, doom.c, prince.c), the engine
+ * (engine.c) and the menu (arcade.c) are pure C and run unchanged on a PC in host/test_games.c.
  * Main.c gives them three things:
  *
  *   time     SysTick at 1 kHz, and a microsecond stopwatch read from it
@@ -90,12 +90,20 @@ static const note_t T_OVER[]   = {{392, 150}, {0, 30}, {330, 150}, {0, 30},
                                   {262, 300}, {0, 0}};
 static const note_t T_HIGH[]   = {{523, 80}, {659, 80}, {784, 80}, {1047, 80},
                                   {0, 40}, {1047, 200}, {0, 0}};
+static const note_t T_SHOT[]   = {{1800, 8}, {900, 10}, {300, 30}, {0, 0}};      /* DOOM: a pistol */
+static const note_t T_HIT[]    = {{420, 20}, {260, 35}, {0, 0}};
+static const note_t T_HURT[]   = {{250, 60}, {180, 90}, {0, 0}};
+static const note_t T_DOOR[]   = {{300, 40}, {450, 40}, {620, 60}, {0, 0}};
+static const note_t T_SWORD[]  = {{2200, 12}, {1500, 10}, {2600, 18}, {0, 0}};   /* PRINCE: steel on steel */
+static const note_t T_THUD[]   = {{150, 45}, {0, 0}};
 
 static const note_t *const tunes[SFX_COUNT] = {
     [SFX_MOVE] = T_MOVE, [SFX_SELECT] = T_SELECT, [SFX_START] = T_START,
     [SFX_EAT] = T_EAT,   [SFX_BOUNCE] = T_BOUNCE, [SFX_BRICK] = T_BRICK,
     [SFX_FLAP] = T_FLAP, [SFX_POINT] = T_POINT,   [SFX_LOSE] = T_LOSE,
     [SFX_LEVEL] = T_LEVEL, [SFX_OVER] = T_OVER,   [SFX_HIGH] = T_HIGH,
+    [SFX_SHOT] = T_SHOT, [SFX_HIT] = T_HIT,       [SFX_HURT] = T_HURT,
+    [SFX_DOOR] = T_DOOR, [SFX_SWORD] = T_SWORD,   [SFX_THUD] = T_THUD,
 };
 
 static const note_t *playing;
