@@ -1059,9 +1059,9 @@ the board.
 
 **Slow motion comes free with a fixed step.** A tick is 20 ms of *game* time;
 how much *real* time it gets is the platform's choice. `Main.c` schedules the
-next update `pace_ms()` later — 20, 25, 33 or 50 ms, the `-` and `+` keys —
-so the whole arcade plays at 100, 80, 60 or 40 % with every trajectory
-unchanged, and no game file knows. It boots at **60 %**, where `ups` reads ~30.
+next update `pace_ms()` later — 20 to 100 ms, the `-` and `+` keys — so the
+whole arcade plays at 100 % down to 20 % with every trajectory unchanged, and
+no game file knows. It boots at **30 %**, where `ups` reads ~15.
 
 ---
 
@@ -1512,12 +1512,12 @@ From this build (`arm-none-eabi-size -A Main.elf`):
 | Section | Bytes | What |
 |---|---:|---|
 | `.text` | 16 844 | code: three games, menu, engine, oled, i2c, pad, adc, beep, keyboard, mirror, printf |
-| `.rodata` | 2 108 | the font (475 B), sprites, note tables, strings |
+| `.rodata` | 2 112 | the font (475 B), sprites, note tables, strings |
 | `.data` | 132 | initialised variables |
 | `.bss` | 3 224 | framebuffer 1 032, snake ring 806, serial rings 544, the rest |
 | stack + heap | 1 536 | reserved by the linker script |
 
-**FLASH 19 272 B of 32 KB (58.8 %), RAM 4 896 B of 12 KB (39.8 %).** Room for
+**FLASH 19 276 B of 32 KB (58.8 %), RAM 4 896 B of 12 KB (39.8 %).** Room for
 a fourth game — Lab Part 8.
 
 The largest piece of code is not a game: newlib-nano's `printf` machinery

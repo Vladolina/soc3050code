@@ -40,12 +40,12 @@ a PC with scripted joysticks.
 ## Build and run
 
 ```
-build.bat        # FLASH 19272 B / 32 KB, RAM 4896 B / 12 KB, zero warnings
+build.bat        # FLASH 19276 B / 32 KB, RAM 4896 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # or: bash host/run.sh  - plain gcc, no board needed
 ```
 
-`arm-none-eabi-size -A`: `.text` 16 844, `.rodata` 2 108, `.data` 132,
+`arm-none-eabi-size -A`: `.text` 16 844, `.rodata` 2 112, `.data` 132,
 `.bss` 3 224 (framebuffer 1 032, snake ring 806, serial rings 544). The arcade's `.data + .bss`
 is 3 356 B of 12 KB; the AVR edition's lesson 24 arcade used 1 372 B of 4 KB.
 
@@ -56,9 +56,10 @@ between `DIRTY` (send changed pages) and `FULL` (send all eight).
 **The same controls from the serial terminal**, so the OLED can be zoomed to
 fill the window with the rest of the board out of sight: arrows = stick,
 `a` = A, `b` or `p` = B, `s` = stick press, `1`–`5` = knob, `?` lists them.
-`-` and `+` set the **pace** — slow motion at 100, 80, 60 or 40 % of real
-time, **60 % at boot** — by running each 20 ms game tick every 20, 25, 33 or
-50 ms of real time (`Main.c`); no game file changes, physics included.
+`-` and `+` set the **pace** — slow motion at 100, 80, 60, 40, 30 or 20 % of
+real time, **30 % at boot** — by running each 20 ms game tick every 20, 25, 33,
+50, 66 or 100 ms of real time (`Main.c`); no game file changes, physics
+included. At full speed the games were too fast to follow in the simulator.
 Type `quiet` + Enter to stop the `$PERF` line, `loud` + Enter to restart it.
 Use the Wokwi VS Code extension's serial terminal, which sends each key as
 it is pressed (lesson 08 saw arrows arrive through it). A terminal never says
@@ -296,7 +297,7 @@ The menu:
 
 ## Status
 
-**Builds with zero warnings** (FLASH 19 272 B, RAM 4 896 B). **The host test
+**Builds with zero warnings** (FLASH 19 276 B, RAM 4 896 B). **The host test
 passes all 45 checks** with the numbers above. Not run on silicon or in Renode.
 
 **Watched running in Wokwi on 2026-11-01**: the menu shows, A starts a game,
@@ -315,8 +316,8 @@ implement"):
    to 1 on a real board. Slide 12's listing shows the `WFI` form.
 
 **Still to measure in Wokwi**: the `$PERF` figures against the host's
-prediction (~50 fps dirty, full-frame `flush_us`), at pace 100 % (`+` twice;
-the default 60 % shows ~30). A full repaint measured
+prediction (~50 fps dirty, full-frame `flush_us`), at pace 100 % (`+` four times;
+the default 30 % shows ~15). A full repaint measured
 106 ms there - I2C runs at ~100 kHz in Wokwi whatever `TIMINGR` says - so
 `FULL` mode will not reach 50 fps in the simulator. Also whether the stick's
 HORZ runs the right way in BREAKOUT. **The terminal keyboard (`kbd.c`, added

@@ -54,14 +54,16 @@
 
 /* Slow motion.  One update is always TICK_MS = 20 ms of GAME time - every
  * speed in snake.c, breakout.c and flappy.c is per tick.  How much REAL time
- * it gets is the platform's choice: run an update every 33 ms instead of 20
- * and the whole arcade plays at 60 %, physics and all, with no game file
- * changed.  The - and + keys step through these; PACE_START is the default. */
-static const uint8_t pace_pct[] = {100, 80, 60, 40};      /* % of real time   */
-#define PACE_COUNT  4
-#define PACE_START  2                                     /* 60 %             */
+ * it gets is the platform's choice: run an update every 66 ms instead of 20
+ * and the whole arcade plays at 30 %, physics and all, with no game file
+ * changed.  The - and + keys step through these; PACE_START is the default:
+ * 30 %, because at full speed the ball, the snake and the bird were too fast
+ * to follow in the simulator. */
+static const uint8_t pace_pct[] = {100, 80, 60, 40, 30, 20};   /* % of real time */
+#define PACE_COUNT  6
+#define PACE_START  4                                          /* 30 %           */
 
-/* Real ms per tick: 20, 25, 33, 50 at TICK_MS 20 (Lab Part 5 changes it). */
+/* Real ms per tick: 20, 25, 33, 50, 66, 100 at TICK_MS 20 (Lab Part 5 changes it). */
 static uint32_t pace_ms(int pace) { return TICK_MS * 100u / pace_pct[pace]; }
 
 /* SLEEP_WFI 1: the idle loop sleeps in WFI until SysTick wakes it - what

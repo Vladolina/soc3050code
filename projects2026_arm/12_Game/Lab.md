@@ -49,7 +49,7 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       19272 B        32 KB     58.81%
+           FLASH:       19276 B        32 KB     58.83%
              RAM:        4896 B        12 KB     39.84%
 ```
 
@@ -91,7 +91,7 @@ to fill the window. Click into the Wokwi serial terminal in VS Code and use:
 | `s` | stick press — `DIRTY` / `FULL` |
 | `1` … `5` | the knob, as a SPEED level |
 | `?` | print this list |
-| `-` / `+` | slow motion: the pace, 40 / 60 / 80 / 100 % — **60 % at boot** |
+| `-` / `+` | slow motion: the pace, 20 / 30 / 40 / 60 / 80 / 100 % — **30 % at boot** |
 | `quiet` + Enter | stop the `$PERF` line — `loud` + Enter brings it back |
 
 The keys go into the same `pad_t` the pins fill (`_lib/kbd.c`), so no game can
@@ -143,9 +143,9 @@ The host test's autopilots set the bar, at level 3:
 
 ## Part 2 — What do dirty pages buy? (20 min)
 
-**First press `+` twice** in the terminal, until it says `pace 100 %`: the
-numbers below are for full speed, and at the boot pace of 60 % `fps` and `ups`
-read about 30 instead of 50.
+**First press `+` four times** (terminal or station), until the board says
+`pace 100 %`: the numbers below are for full speed, and at the boot pace of
+30 % `fps` and `ups` read about 15 instead of 50.
 
 **Do this:** play SNAKE for 10 seconds and copy three `$PERF` lines. Press the
 joystick (SEL) once — the last field changes from `DIRTY` to `FULL` — and copy
