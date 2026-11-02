@@ -22,7 +22,12 @@
  *           toggles "dirty pages" vs "repaint everything" so you can measure
  *           what dirty pages save (Lab Part 2).
  *
- * Build:     build.bat
+ * The same controls from the serial terminal (kbd.h): arrows = stick,
+ * a = A,  b or p = B,  s = SEL,  1-5 = knob,  ? = list them,  and the words
+ * "quiet" / "loud" + Enter stop and restart $PERF.  So the OLED can be zoomed
+ * to fill the window and the game played without seeing the board.
+ *
+ * Build:    build.bat
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf.
  */
 #include <stdarg.h>
@@ -36,9 +41,22 @@
 #include "proto.h"
 #include "engine.h"
 #include "arcade.h"
+#include "kbd.h"
 
 #define BAUD         115200u
-#define MAX_CATCHUP  4               /* at most 4 updates (80 ms) per frame */
+#define MAX_CATCHUP  4               /* at most 4 updates per frame         */
+
+/* Slow motion.  One update is always TICK_MS = 20 ms of GAME time - every
+ * speed in snake.c, breakout.c and flappy.c is per tick.  How much REAL time
+ * it gets is the platform's choice: run an update every 33 ms instead of 20
+ * and the whole arcade plays at 60 %, physics and all, with no game file
+ * changed.  The - and + keys step through these; PACE_START is the default. */
+static const uint8_t pace_pct[] = {100, 80, 60, 40};      /* % of real time   */
+#define PACE_COUNT  4
+#define PACE_START  2                                     /* 60 %             */
+
+/* Real ms per tick: 20, 25, 33, 50 at TICK_MS 20 (Lab Part 5 changes it). */
+static uint32_t pace_ms(int pace) { return TICK_MS * 100u / pace_pct[pace]; }
 
 /* SLEEP_WFI 1: the idle loop sleeps in WFI until SysTick wakes it - what
  * silicon should do.  0: it spins until the tick instead.  Wokwi needs 0:
@@ -139,6 +157,65 @@ static void send_frame(const char *fmt, ...)
 }
 
 /* ============================================================================
+ *  Keyboard: bytes from the terminal, caught by an interrupt
+ * ============================================================================
+ * The UART holds ONE received byte.  An arrow is three (ESC [ A) arriving
+ * 87 us apart, and the loop looks once a millisecond - polling would keep the
+ * last byte and lose the ESC.  So the RXNE interrupt moves each byte into a
+ * ring at once, and the loop drains the ring at its leisure (lesson 08). */
+#define RX_SIZE 32u                          /* a power of two: index & (size-1) */
+
+static volatile uint8_t  rx_buf[RX_SIZE];
+static volatile uint32_t rx_head, rx_tail;   /* ISR writes head, loop writes tail */
+
+void USART2_IRQHandler(void)
+{
+    uint32_t isr = USART2->ISR;
+    if (isr & USART_ISR_ORE) { USART2->ICR = USART_ICR_ORECF; }  /* else RX stalls */
+    if (isr & USART_ISR_RXNE_RXFNE) {
+        uint8_t c = (uint8_t)USART2->RDR;                /* reading RDR clears RXNE */
+        if (rx_head - rx_tail < RX_SIZE) { rx_buf[rx_head & (RX_SIZE - 1u)] = c; rx_head++; }
+    }
+}
+
+static void keyboard_init(void)
+{
+    USART2->CR1 |= USART_CR1_RXNEIE_RXFNEIE;    /* retarget.c turned RE on already */
+    NVIC_SetPriority(USART2_IRQn, 1);
+    NVIC_EnableIRQ(USART2_IRQn);
+}
+
+static void print_keys(void)
+{
+    printf("  keys     : arrows = stick, a = A, b/p = B, s = SEL, 1-5 = knob, ? = this\n"
+           "             - / + = slow motion,  quiet / loud + Enter = stop / restart $PERF\n");
+}
+
+/* Drain the ring into the decoder; act on, and say, what a command did. */
+static void keyboard_poll(kbd_t *k, int *perf_on, int *pace)
+{
+    while (rx_tail != rx_head) {
+        uint8_t c = rx_buf[rx_tail & (RX_SIZE - 1u)];
+        rx_tail++;
+        int cmd = kbd_feed(k, c, ms);
+        switch (cmd) {
+        case KBD_QUIET:   *perf_on = 0; printf("quiet: $PERF off - type loud to resume\n"); break;
+        case KBD_LOUD:    *perf_on = 1; printf("loud: $PERF on\n");                         break;
+        case KBD_HELP:    print_keys();                                                     break;
+        case KBD_SLOWER:
+        case KBD_FASTER:
+            if (cmd == KBD_SLOWER && *pace < PACE_COUNT - 1) { (*pace)++; }
+            if (cmd == KBD_FASTER && *pace > 0)              { (*pace)--; }
+            printf("pace %u %%: one update every %u ms\n",
+                   (unsigned)pace_pct[*pace], (unsigned)pace_ms(*pace));
+            break;
+        case KBD_UNKNOWN: printf("? '%s' - words are quiet, loud; ? lists the keys\n", kbd_word(k)); break;
+        default: break;
+        }
+    }
+}
+
+/* ============================================================================
  *  The loop
  * ============================================================================ */
 int main(void)
@@ -158,13 +235,20 @@ int main(void)
     beep_init();
     printf("  buzzer   : PA6, TIM3_CH1\n");
     printf("  frames   : $SCORE,game,score  per game;  $PERF,fps,ups,flush_us,max_us,bytes,busy%%,mode  per second\n");
-    printf("  stick press toggles the profiler mode: dirty pages / full repaint\n\n");
+    printf("  stick press toggles the profiler mode: dirty pages / full repaint\n");
+    keyboard_init();
+    print_keys();
+    printf("  pace     : %u %% - one %u ms game tick every %u ms; - and + change it\n",
+           (unsigned)pace_pct[PACE_START], (unsigned)TICK_MS, (unsigned)pace_ms(PACE_START));
+    printf("\n");
 
     arcade_init();
     oled_contrast(0xCF);
 
     pad_t pad;
-    int full_repaint = 0;
+    kbd_t kbd;
+    kbd_init(&kbd);
+    int full_repaint = 0, perf_on = 1, pace = PACE_START;
     uint32_t next = ms;                /* when the next update is due       */
     uint32_t sec_start = ms;
     uint32_t frames = 0, updates = 0, busy_us = 0, flush_sum = 0, flush_max = 0;
@@ -173,17 +257,19 @@ int main(void)
     for (;;) {
         sound_poll(ms);
 
-        /* ---- UPDATE: run every tick that is due, at exactly 20 ms each ---- */
+        /* ---- UPDATE: run every tick that is due, one per pace_ms(pace) --- */
         int ran = 0;
         uint32_t t0 = now_us();
+        keyboard_poll(&kbd, &perf_on, &pace);
         while ((int32_t)(ms - next) >= 0) {
             pad_read(&pad);
+            kbd_apply(&kbd, &pad, ms);    /* the terminal's keys, into the same pad */
             if (pad.pressed & PAD_SEL) { full_repaint ^= 1; }
             arcade_step(&pad);
             updates++;
-            next += TICK_MS;
+            next += pace_ms(pace);                /* = TICK_MS of game time    */
             if (++ran == MAX_CATCHUP) {           /* hopelessly behind: give up */
-                next = ms + TICK_MS;              /* the lost time, rather than */
+                next = ms + pace_ms(pace);        /* the lost time, rather than */
                 break;                            /* spiral into catching up    */
             }
         }
@@ -214,14 +300,16 @@ int main(void)
         uint32_t el = ms - sec_start;
         if (el >= 1000u) {
             uint32_t bytes = oled_bytes_sent() - bytes_at_sec;
-            send_frame("PERF,%lu,%lu,%lu,%lu,%lu,%lu,%s",
-                       (unsigned long)(frames * 1000u / el),
-                       (unsigned long)(updates * 1000u / el),
-                       (unsigned long)(flush_sum / frames),
-                       (unsigned long)flush_max,
-                       (unsigned long)(bytes / frames),
-                       (unsigned long)(busy_us / (el * 10u)),        /* percent */
-                       full_repaint ? "FULL" : "DIRTY");
+            if (perf_on) {                            /* "quiet" turns it off */
+                send_frame("PERF,%lu,%lu,%lu,%lu,%lu,%lu,%s",
+                           (unsigned long)(frames * 1000u / el),
+                           (unsigned long)(updates * 1000u / el),
+                           (unsigned long)(flush_sum / frames),
+                           (unsigned long)flush_max,
+                           (unsigned long)(bytes / frames),
+                           (unsigned long)(busy_us / (el * 10u)),        /* percent */
+                           full_repaint ? "FULL" : "DIRTY");
+            }
             sec_start = ms;
             frames = updates = busy_us = flush_sum = flush_max = 0;
             bytes_at_sec = oled_bytes_sent();

@@ -26,6 +26,7 @@
 #include "arcade.h"
 #include "i2c.h"
 #include "proto.h"
+#include "kbd.h"
 
 /* ============================================================================
  *  The stubs: an I2C bus that only counts, and the two platform hooks
@@ -127,6 +128,14 @@ static uint32_t fb_hash(void)
 typedef pad_t (*pilot_fn)(int t);
 
 static pad_t no_input(int t) { (void)t; pad_t p; memset(&p, 0, sizeof p); p.knob = 500; return p; }
+
+/* Bytes into kbd.c as a terminal would send them; the last command wins. */
+static int kbd_type(kbd_t *k, const char *s, uint32_t now)
+{
+    int cmd = KBD_NONE;
+    for (; *s; s++) { int c = kbd_feed(k, (uint8_t)*s, now); if (c != KBD_NONE) { cmd = c; } }
+    return cmd;
+}
 
 /* SNAKE: of the moves that do not die at once, prefer those that leave room
  * to live (a flood fill counts the reachable cells), then the shortest way to
@@ -439,6 +448,62 @@ int main(int argc, char **argv)
     strcpy(bad, last_score_line);
     bad[13] = (char)(bad[13] == '9' ? '8' : '9');                    /* "edit" the score */
     CHECK(proto_check(bad, &body, &blen) == PROTO_MISMATCH, "an edited score fails the checksum: %s", bad);
+
+    /* ---- the keyboard: kbd.c turns terminal bytes into the same pad --------- */
+    printf("\nKEYBOARD (kbd.c, the terminal's keys as a pad)\n");
+    kbd_t kb;
+    kbd_init(&kb);
+    pad_t kp;
+    uint32_t now = 1000;
+    kbd_type(&kb, "\x1b[A", now);                         /* Up, as a terminal sends it */
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 20);
+    int up_now = kp.y;
+    kp = no_input(0); kbd_apply(&kb, &kp, now + KBD_HOLD_MS + 1);
+    CHECK(up_now == 100 && kp.y == 0, "ESC [ A pushes the stick up (y %d), and lets go after %u ms (y %d)",
+          up_now, (unsigned)KBD_HOLD_MS, kp.y);
+    int held = 1;                                         /* auto-repeat: every 33 ms */
+    for (uint32_t ms = 0; ms < 600; ms += 20) {
+        if (ms % 33u < 20u) { kbd_type(&kb, "\x1b[C", now + ms); }
+        kp = no_input(0); kbd_apply(&kb, &kp, now + ms);
+        if (kp.x != 100) { held = 0; }
+    }
+    CHECK(held, "a held Right, auto-repeating at 30 Hz, holds the stick right for 600 ms");
+    kbd_type(&kb, "\x1b[D", now + 700); kbd_type(&kb, "\x1b[C", now + 701);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 702);
+    CHECK(kp.x == 100, "Left then Right: the last arrow wins at once (x %d)", kp.x);
+    kbd_type(&kb, "a", now + 800);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 800);
+    int first_a = kp.pressed;
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 820);
+    CHECK(first_a == PAD_A && kp.pressed == 0, "a is ONE press of A, not a held button");
+    kbd_type(&kb, "P", now + 900);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 900);
+    CHECK(kp.pressed == PAD_B, "p (either case) is B - pause");
+    int got_q = kbd_type(&kb, "quiet\r\n", now + 1000);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 1000);
+    CHECK(got_q == KBD_QUIET && kp.pressed == 0, "typing quiet + Enter is KBD_QUIET and presses no button");
+    CHECK(kbd_type(&kb, "loud\r", now + 1100) == KBD_LOUD, "loud + Enter is KBD_LOUD");
+    CHECK(kbd_type(&kb, "-", now + 1150) == KBD_SLOWER && kbd_type(&kb, "+", now + 1160) == KBD_FASTER
+          && kbd_type(&kb, "=", now + 1170) == KBD_FASTER, "- is slower; + and = (unshifted +) are faster");
+    CHECK(kbd_type(&kb, "lod\x7fud\r", now + 1200) == KBD_LOUD, "Backspace edits the word: lod<BS>ud = loud");
+    int unk = kbd_type(&kb, "xyz\r", now + 1300);
+    CHECK(unk == KBD_UNKNOWN && strcmp(kbd_word(&kb), "xyz") == 0, "an unknown word is reported by name: '%s'", kbd_word(&kb));
+    kbd_type(&kb, "4", now + 1400);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 1400);
+    int k4 = kp.knob;
+    kp = no_input(0); kp.knob = 900; kbd_apply(&kb, &kp, now + 1420);
+    CHECK(k4 == 700 && kp.knob == 900, "4 sets the knob to 700 (level 4) until the real knob turns (now %d)", kp.knob);
+
+    reset_panel();                                        /* the arcade, played by keys */
+    arcade_init();
+    kbd_init(&kb);
+    now = 5000;
+    for (int i = 0; i < 10; i++) { kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp); now += TICK_MS; }
+    kbd_type(&kb, "\x1b[A", now);                         /* one tap: wraps to FLAP */
+    for (int i = 0; i < 20; i++) { kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp); now += TICK_MS; }
+    kbd_type(&kb, "a", now);
+    kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp);
+    CHECK(arcade_game() == 2 && arcade_state() == ARC_PLAY, "the arcade by keys: one Up tap selects FLAP, a starts it");
 
     printf("\nscreenshots written to host/out/: snake breakout flap menu gameover (.txt and .svg)\n");
     printf("%s: %d check(s) failed\n", failures ? "FAILED" : "PASSED", failures);

@@ -49,8 +49,8 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       16056 B        32 KB     49.00%
-             RAM:        4248 B        12 KB     34.57%
+           FLASH:       17608 B        32 KB     53.74%
+             RAM:        4288 B        12 KB     34.90%
 ```
 
 Paste `diagram.json` into Wokwi (**required** — the OLED, joystick, buttons,
@@ -79,6 +79,26 @@ diagram has focus"). Turn the **knob**: the five SPEED boxes follow it. Press
 > Not yet watched: whether the `a` key reaches button A while the joystick
 > has keyboard focus. If it does not, click the button with the mouse — and
 > note it down; it decides how playable FLAP is.
+
+**Or play from the serial terminal** — the easier way once the OLED is zoomed
+to fill the window. Click into the Wokwi serial terminal in VS Code and use:
+
+| Key | Does |
+|---|---|
+| arrows | the stick |
+| `a` | button A — play, serve, flap |
+| `b` or `p` | button B — pause, back |
+| `s` | stick press — `DIRTY` / `FULL` |
+| `1` … `5` | the knob, as a SPEED level |
+| `?` | print this list |
+| `-` / `+` | slow motion: the pace, 40 / 60 / 80 / 100 % — **60 % at boot** |
+| `quiet` + Enter | stop the `$PERF` line — `loud` + Enter brings it back |
+
+The keys go into the same `pad_t` the pins fill (`kbd.c`), so no game can
+tell. One difference you will feel: a terminal sends a key when it is
+pressed, never when it is released, so an arrow holds the stick for 150 ms
+and your PC's auto-repeat keeps it held. Hold Right in BREAKOUT and watch the
+paddle pause once before auto-repeat starts.
 
 ---
 
@@ -109,6 +129,10 @@ The host test's autopilots set the bar, at level 3:
 ---
 
 ## Part 2 — What do dirty pages buy? (20 min)
+
+**First press `+` twice** in the terminal, until it says `pace 100 %`: the
+numbers below are for full speed, and at the boot pace of 60 % `fps` and `ups`
+read about 30 instead of 50.
 
 **Do this:** play SNAKE for 10 seconds and copy three `$PERF` lines. Press the
 joystick (SEL) once — the last field changes from `DIRTY` to `FULL` — and copy
@@ -222,7 +246,8 @@ screenshot in `host\out\flap.txt` shows your bird, drawn by the real code.
 
 ## Part 5 — Spend the frame budget (15 min)
 
-`TICK_MS` in `engine.h` is 20: 50 updates a second. Make it **10** (100 Hz).
+`TICK_MS` in `engine.h` is 20: 50 updates a second at pace 100 % (press `+`
+until it says so). Make it **10** (100 Hz).
 
 **Guess first:** with a full flush costing ~25 ms, what happens to `fps` and
 `ups` in `FULL` mode? And does the snake move faster?

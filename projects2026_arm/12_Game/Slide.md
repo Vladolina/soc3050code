@@ -1057,6 +1057,12 @@ frame costing its modelled bus time:
 These are `$PERF`'s `fps` and `ups` fields — the first two numbers to check on
 the board.
 
+**Slow motion comes free with a fixed step.** A tick is 20 ms of *game* time;
+how much *real* time it gets is the platform's choice. `Main.c` schedules the
+next update `pace_ms()` later — 20, 25, 33 or 50 ms, the `-` and `+` keys —
+so the whole arcade plays at 100, 80, 60 or 40 % with every trajectory
+unchanged, and no game file knows. It boots at **60 %**, where `ups` reads ~30.
+
 ---
 
 ## Slide 14: A Microsecond Stopwatch, Free, From SysTick
@@ -1150,6 +1156,13 @@ documentation says so); `pad.c` flips it, so *x* > 0 is always right.
 Edges are only as good as the sampling: `pressed` is set for **one** call of
 `pad_read()`. That is why the loop reads the pad inside the update loop — once
 per tick, never skipped — and not once per frame.
+
+**The keyboard is a second source for the same `pad_t`.** Right after
+`pad_read()`, `kbd_apply()` writes the serial terminal's keys into it —
+arrows into `x`/`y`, `a`/`b`/`s` into `pressed`, a digit into `knob` — so no
+game knows which one moved it. A terminal reports a key going **down**, never
+up, so a held arrow is inferred: each arrival holds the stick 150 ms and the
+PC's auto-repeat keeps renewing it.
 
 ---
 
@@ -1493,13 +1506,13 @@ From this build (`arm-none-eabi-size -A Main.elf`):
 
 | Section | Bytes | What |
 |---|---:|---|
-| `.text` | 14 168 | code: three games, menu, engine, oled, i2c, pad, adc, beep, printf |
-| `.rodata` | 1 568 | the font (475 B), sprites, note tables, strings |
+| `.text` | 15 340 | code: three games, menu, engine, oled, i2c, pad, adc, beep, keyboard, printf |
+| `.rodata` | 1 948 | the font (475 B), sprites, note tables, strings |
 | `.data` | 132 | initialised variables |
-| `.bss` | 2 580 | framebuffer 1 032, snake ring 806, the rest |
+| `.bss` | 2 620 | framebuffer 1 032, snake ring 806, the rest |
 | stack + heap | 1 536 | reserved by the linker script |
 
-**FLASH 16 056 B of 32 KB (49.0 %), RAM 4 248 B of 12 KB (34.6 %).** Room for
+**FLASH 17 608 B of 32 KB (53.7 %), RAM 4 288 B of 12 KB (34.9 %).** Room for
 a fourth game — Lab Part 8.
 
 The largest piece of code is not a game: newlib-nano's `printf` machinery

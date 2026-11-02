@@ -26,9 +26,10 @@ a PC with scripted joysticks.
 | `engine.h`, `engine.c` | **subject.** The `game_t` contract, `sfx()` hook, xorshift32, `aabb()`, HUD and message box. Pure C |
 | `arcade.h`, `arcade.c` | menu / play / pause / game-over state machine, high scores, `score_frame()`. Pure C |
 | `snake.c`, `breakout.c`, `flappy.c` | the three games: ring buffer + bitmap; bricks as bitmasks; Euler physics and a sprite. Pure C |
-| `build.bat` | `LIBS=retarget i2c oled adc pad beep proto` — no `os` (slide 15) |
+| `kbd.h`, `kbd.c` | every control from the serial terminal, written into the same `pad_t` the pins fill; `-` / `+` for the pace, `quiet` / `loud` for `$PERF`. Pure C, on lesson 08's `keys.c` |
+| `build.bat` | `LIBS=retarget i2c oled adc pad beep proto keys` — no `os` (slide 15) |
 | `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, copied unchanged from `_targets/app-board-diagram.json` |
-| `host/test_games.c` | **the host test**: real game files + real `_lib/oled.c`/`proto.c`, a counting I²C stub; 20 checks, bus table, simulated loop, screenshots; `--playtest` for Lab Part 6 |
+| `host/test_games.c` | **the host test**: real game files + real `_lib/oled.c`/`proto.c`, a counting I²C stub; 32 checks, bus table, simulated loop, screenshots; `--playtest` for Lab Part 6 |
 | `host/run.bat`, `host/run.sh` | build and run it with plain `gcc` |
 | `host/embed_shots.py` | rewrites the deck's screenshot blocks from `host/out/*.svg` |
 | `host/sprite.py` | ASCII art → the column bytes `oled_sprite()` wants (Lab Part 4) |
@@ -38,18 +39,31 @@ a PC with scripted joysticks.
 ## Build and run
 
 ```
-build.bat        # FLASH 16056 B / 32 KB, RAM 4248 B / 12 KB, zero warnings
+build.bat        # FLASH 17608 B / 32 KB, RAM 4288 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # or: bash host/run.sh  - plain gcc, no board needed
 ```
 
-`arm-none-eabi-size -A`: `.text` 14 092, `.rodata` 1 568, `.data` 132,
-`.bss` 2 580 (framebuffer 1 032, snake ring 806). The arcade's `.data + .bss`
-is 2 712 B of 12 KB; the AVR edition's lesson 24 arcade used 1 372 B of 4 KB.
+`arm-none-eabi-size -A`: `.text` 15 340, `.rodata` 1 948, `.data` 132,
+`.bss` 2 620 (framebuffer 1 032, snake ring 806). The arcade's `.data + .bss`
+is 2 752 B of 12 KB; the AVR edition's lesson 24 arcade used 1 372 B of 4 KB.
 
 **Controls:** stick steers / chooses, **A** plays, serves and flaps, **B**
 pauses, **knob** = speed 1–5 (in the menu), **stick press** toggles `$PERF`
 between `DIRTY` (send changed pages) and `FULL` (send all eight).
+
+**The same controls from the serial terminal**, so the OLED can be zoomed to
+fill the window with the rest of the board out of sight: arrows = stick,
+`a` = A, `b` or `p` = B, `s` = stick press, `1`–`5` = knob, `?` lists them.
+`-` and `+` set the **pace** — slow motion at 100, 80, 60 or 40 % of real
+time, **60 % at boot** — by running each 20 ms game tick every 20, 25, 33 or
+50 ms of real time (`Main.c`); no game file changes, physics included.
+Type `quiet` + Enter to stop the `$PERF` line, `loud` + Enter to restart it.
+Use the Wokwi VS Code extension's serial terminal, which sends each key as
+it is pressed (lesson 08 saw arrows arrive through it). A terminal never says
+when a key is *released*, so an arrow holds the stick for 150 ms and the
+PC's auto-repeat renews it; before auto-repeat starts the stick lets go
+once, and a BREAKOUT paddle stutters at first. `kbd.h` explains.
 
 ## Facts checked against sources, not memory
 
@@ -72,9 +86,9 @@ between `DIRTY` (send changed pages) and `FULL` (send all eight).
 ## Verified by execution — on the host
 
 `host/run.bat` compiles `engine.c`, `arcade.c`, `snake.c`, `breakout.c`,
-`flappy.c`, `_lib/oled.c` and `_lib/proto.c` with MinGW gcc 15.2 (`-Wall
+`flappy.c`, `kbd.c`, `_lib/oled.c`, `_lib/proto.c` and `_lib/keys.c` with MinGW gcc 15.2 (`-Wall
 -Wextra`, zero warnings) and replaces only `i2c_write_read()` (counts bytes,
-models 9 bits per byte at 400 kHz), `sfx()` and `on_score()`. **20 checks, all
+models 9 bits per byte at 400 kHz), `sfx()` and `on_score()`. **32 checks, all
 pass; exits non-zero on any failure.**
 
 | Test | Measured on the host |
@@ -92,6 +106,7 @@ pass; exits non-zero on any failure.**
 | SNAKE drawn clear-and-redraw (Lab Part 3) | 970 B / frame — the dirty-page check fails, as it should |
 | loop vs a simulated clock | 50 updates/s in every case; fps 50 (SNAKE, BREAKOUT dirty), 46.8 (FLAP dirty), 40.1 (any full repaint) |
 | arcade | menu navigation, A to play, game over reported once, `$SCORE,SNAKE,172*2E` passes `proto_check()`, high score kept, an edited score (`*2A`) rejected |
+| keyboard (`kbd.c`) | `ESC [ A` = stick up for 150 ms, held by 30 Hz auto-repeat; the last arrow wins; `a` is one press; `quiet`/`loud` + Enter press nothing; Backspace edits; `4` = knob 700 until the real knob turns; `-` slower, `+`/`=` faster; one Up tap + `a` starts FLAP |
 | `--playtest`, FLAP pipes at levels 1–5 | 135, 93, 63, 15, 4 — a cliff between 3 and 4 (Lab Part 6) |
 
 **Two bugs the host test found in this lesson's own first draft**, both fixed
@@ -269,8 +284,8 @@ The menu:
 
 ## Status
 
-**Builds with zero warnings** (FLASH 16 056 B, RAM 4 248 B). **The host test
-passes all 20 checks** with the numbers above. Not run on silicon or in Renode.
+**Builds with zero warnings** (FLASH 17 608 B, RAM 4 288 B). **The host test
+passes all 32 checks** with the numbers above. Not run on silicon or in Renode.
 
 **Watched running in Wokwi on 2026-11-01**: the menu shows, A starts a game,
 the stick moves the selection, sound plays. Getting there took three fixes,
@@ -288,10 +303,13 @@ implement"):
    to 1 on a real board. Slide 12's listing shows the `WFI` form.
 
 **Still to measure in Wokwi**: the `$PERF` figures against the host's
-prediction (~50 fps dirty, full-frame `flush_us`). A full repaint measured
+prediction (~50 fps dirty, full-frame `flush_us`), at pace 100 % (`+` twice;
+the default 60 % shows ~30). A full repaint measured
 106 ms there - I2C runs at ~100 kHz in Wokwi whatever `TIMINGR` says - so
 `FULL` mode will not reach 50 fps in the simulator. Also whether the stick's
-HORZ runs the right way in BREAKOUT.
+HORZ runs the right way in BREAKOUT. **The terminal keyboard (`kbd.c`, added
+2026-11-03) is not yet watched in Wokwi** - only on the host - including how
+the paddle feels under auto-repeat.
 
 **Taught without lessons 09-11 (2026-11-01).** The class skipped them, so this
 deck is its first contact with I2C. Slide 3b now teaches the bus on one page
