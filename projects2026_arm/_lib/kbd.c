@@ -1,5 +1,6 @@
 /*
- * kbd.c - the whole game pad, from the serial terminal.  See kbd.h.
+ * kbd.c - shared library, LIBS=kbd keys: the app board's pad from the
+ *         serial terminal.  See kbd.h.
  *
  * Two layers.  lesson 08's keys.c turns bytes into keys - ESC [ A is Up -
  * and this file turns keys into a pad: arrows into a stick that is held for a

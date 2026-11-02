@@ -1,21 +1,26 @@
 /*
- * kbd.h - the whole game pad, from the serial terminal
+ * kbd.h - the app board's pad, from the serial terminal   LIBS=kbd keys pad adc
  *
- * Every control on the board has a key, so the game can be played with the
- * OLED zoomed to fill the window and the rest of the board out of sight:
+ * Written for lesson 12; shared by every lesson on the app board.  Every
+ * control has a key, so a lesson can be run with the OLED zoomed to fill the
+ * window and the rest of the board out of sight:
  *
- *   arrows    the stick                     a        button A  (play, serve, flap)
- *   1 .. 5    the knob, as a level          b or p   button B  (pause, back)
- *   s         stick press (SEL): profiler   ?        print this list
- *   -  +      slow motion: the pace, 40 .. 100 %  (Main.c)
+ *   arrows    the stick                     a        button A
+ *   1 .. 5    the knob, in fifths           b or p   button B
+ *   s         stick press (SEL)             ?        KBD_HELP: the lesson prints its list
+ *   -  +      KBD_SLOWER / KBD_FASTER: the lesson decides what they mean
+ *             (lesson 12: the game's pace)
  *
  * and two words, typed and ended with Enter:
  *
- *   quiet     stop the $PERF line           loud     start it again
+ *   quiet     KBD_QUIET: stop periodic output   loud   KBD_LOUD: start it again
  *
- * A key does not reach the games as a key.  kbd_apply() writes it into the
- * same pad_t that pad_read() fills from the pins, so snake.c, breakout.c,
- * flappy.c and arcade.c cannot tell the keyboard from the board.
+ * kbd.c never prints and never touches the UART: the lesson hands it bytes,
+ * from wherever its bytes come from, and acts on what kbd_feed() returns.
+ *
+ * A key does not reach the application as a key.  kbd_apply() writes it into
+ * the same pad_t that pad_read() fills from the pins, so the code above -
+ * lesson 12's games, for one - cannot tell the keyboard from the board.
  *
  * The one real difference is the stick.  A terminal sends an arrow when it is
  * PRESSED, never when it is released - so "held" has to be inferred: an arrow
@@ -23,9 +28,9 @@
  * renewing it while the key stays down.  Before auto-repeat starts (about half
  * a second, set by the PC) the stick lets go once, so a BREAKOUT paddle
  * stutters at first.  A short tap is a short push: it steers SNAKE, flaps in
- * FLAP and moves the menu one line.
+ * FLAP and moves a menu one line.
  *
- * Pure C, no hardware: host/test_games.c runs it on a PC.
+ * Pure C, no hardware: lesson 12's host/test_games.c runs it on a PC.
  */
 #ifndef KBD_H
 #define KBD_H

@@ -26,8 +26,8 @@ a PC with scripted joysticks.
 | `engine.h`, `engine.c` | **subject.** The `game_t` contract, `sfx()` hook, xorshift32, `aabb()`, HUD and message box. Pure C |
 | `arcade.h`, `arcade.c` | menu / play / pause / game-over state machine, high scores, `score_frame()`. Pure C |
 | `snake.c`, `breakout.c`, `flappy.c` | the three games: ring buffer + bitmap; bricks as bitmasks; Euler physics and a sprite. Pure C |
-| `kbd.h`, `kbd.c` | every control from the serial terminal, written into the same `pad_t` the pins fill; `-` / `+` for the pace, `quiet` / `loud` for `$PERF`. Pure C, on lesson 08's `keys.c` |
-| `build.bat` | `LIBS=retarget i2c oled adc pad beep proto keys` — no `os` (slide 15) |
+| `_lib/kbd.h`, `_lib/kbd.c` | (shared, `LIBS=kbd`) every control from the serial terminal, written into the same `pad_t` the pins fill; `-` / `+` for the pace, `quiet` / `loud` for `$PERF`. Pure C, on lesson 08's `keys.c` |
+| `build.bat` | `LIBS=retarget i2c oled adc pad beep proto keys kbd` — no `os` (slide 15) |
 | `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, copied unchanged from `_targets/app-board-diagram.json` |
 | `host/test_games.c` | **the host test**: real game files + real `_lib/oled.c`/`proto.c`, a counting I²C stub; 32 checks, bus table, simulated loop, screenshots; `--playtest` for Lab Part 6 |
 | `host/run.bat`, `host/run.sh` | build and run it with plain `gcc` |
@@ -63,7 +63,7 @@ Use the Wokwi VS Code extension's serial terminal, which sends each key as
 it is pressed (lesson 08 saw arrows arrive through it). A terminal never says
 when a key is *released*, so an arrow holds the stick for 150 ms and the
 PC's auto-repeat renews it; before auto-repeat starts the stick lets go
-once, and a BREAKOUT paddle stutters at first. `kbd.h` explains.
+once, and a BREAKOUT paddle stutters at first. `_lib/kbd.h` explains.
 
 ## Facts checked against sources, not memory
 
@@ -86,7 +86,7 @@ once, and a BREAKOUT paddle stutters at first. `kbd.h` explains.
 ## Verified by execution — on the host
 
 `host/run.bat` compiles `engine.c`, `arcade.c`, `snake.c`, `breakout.c`,
-`flappy.c`, `kbd.c`, `_lib/oled.c`, `_lib/proto.c` and `_lib/keys.c` with MinGW gcc 15.2 (`-Wall
+`flappy.c`, `_lib/oled.c`, `_lib/proto.c`, `_lib/keys.c` and `_lib/kbd.c` with MinGW gcc 15.2 (`-Wall
 -Wextra`, zero warnings) and replaces only `i2c_write_read()` (counts bytes,
 models 9 bits per byte at 400 kHz), `sfx()` and `on_score()`. **32 checks, all
 pass; exits non-zero on any failure.**

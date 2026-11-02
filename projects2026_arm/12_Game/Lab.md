@@ -94,7 +94,7 @@ to fill the window. Click into the Wokwi serial terminal in VS Code and use:
 | `-` / `+` | slow motion: the pace, 40 / 60 / 80 / 100 % — **60 % at boot** |
 | `quiet` + Enter | stop the `$PERF` line — `loud` + Enter brings it back |
 
-The keys go into the same `pad_t` the pins fill (`kbd.c`), so no game can
+The keys go into the same `pad_t` the pins fill (`_lib/kbd.c`), so no game can
 tell. One difference you will feel: a terminal sends a key when it is
 pressed, never when it is released, so an arrow holds the stick for 150 ms
 and your PC's auto-repeat keeps it held. Hold Right in BREAKOUT and watch the

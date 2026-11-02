@@ -4,7 +4,7 @@ REM The real game files and the real oled.c; only the I2C bus is a stub.
 REM Then, to refresh the deck's screenshots:  python embed_shots.py
 pushd "%~dp0"
 if not exist out mkdir out
-gcc -std=c11 -O2 -Wall -Wextra -I.. -I..\..\_lib -o out\test_games.exe test_games.c ..\engine.c ..\arcade.c ..\snake.c ..\breakout.c ..\flappy.c ..\kbd.c ..\..\_lib\oled.c ..\..\_lib\proto.c ..\..\_lib\keys.c
+gcc -std=c11 -O2 -Wall -Wextra -I.. -I..\..\_lib -o out\test_games.exe test_games.c ..\engine.c ..\arcade.c ..\snake.c ..\breakout.c ..\flappy.c ..\..\_lib\oled.c ..\..\_lib\proto.c ..\..\_lib\keys.c ..\..\_lib\kbd.c
 if errorlevel 1 (popd & exit /b 1)
 out\test_games.exe
 set RC=%ERRORLEVEL%
