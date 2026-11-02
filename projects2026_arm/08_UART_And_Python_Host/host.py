@@ -25,7 +25,7 @@ Other things it does:
                                 between MIN and MAX (default 0..1000)
   --selftest                    check the checksum against a real GPS sentence
 
-Needs only the standard library, plus pyserial for --port (pip install pyserial).
+Needs only the standard library, plus pyserial for --port (uv sync at the repository root).
 """
 import argparse
 import math
@@ -112,7 +112,7 @@ def open_port(url):
     try:
         import serial
     except ImportError:
-        sys.exit("pyserial is needed for --port:  pip install pyserial")
+        sys.exit("pyserial is needed for --port:  uv sync  at the repository root")
     return serial.serial_for_url(url, baudrate=115200, timeout=0.2)
 
 
@@ -168,7 +168,7 @@ def plot(tel):
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("\n(matplotlib not installed - text chart above; pip install matplotlib to plot)")
+        print("\n(matplotlib not installed - text chart above; uv sync  at the repository root to plot)")
         return
     plt.plot(tel.t, tel.tri, marker=".")
     plt.xlabel("board time (s)")

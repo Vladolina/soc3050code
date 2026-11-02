@@ -24,5 +24,6 @@ typedef struct {
 void uart_init(uint32_t pclk, uint32_t baud);   /* call before os_start()          */
 uint8_t uart_getc(void);                         /* from a task: blocks until a byte */
 const volatile uart_stats_t *uart_stats(void);
+uint32_t uart_tx_room(void);                    /* bytes printf can add now without waiting */
 
 #endif

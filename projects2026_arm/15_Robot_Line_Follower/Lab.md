@@ -51,7 +51,7 @@ build.bat
 simulate.bat
 ```
 
-Zero warnings, and about **FLASH 26 988 B, RAM 9 352 B**. Paste
+Zero warnings, and about **FLASH 29 484 B, RAM 9 744 B**. Paste
 `diagram.json` into the Wokwi tab (**required** — the OLED, joystick,
 buttons, knob and buzzer all live there), then `F1` → **Upload Firmware and
 Start Simulation…** → `Main.elf`. The serial monitor shows:
@@ -61,7 +61,10 @@ Start Simulation…** → `Main.elf`. The serial monitor shows:
   pad      : joystick, knob, A, B, SEL
   OLED     : SSD1306 at 0x3C
   world    : 200 Hz physics, 100 Hz control, 7 sensors at 13 mm
-  shell    : kp ki kd df slow thr N | noise ambient fail N | gains | stats
+  shell    : kp ki kd df slow thr N | noise ambient fail N | gains | stats | quiet loud
+  station  : uv run tools/station/station.py - the OLED large, the race from above
+  keys     : arrows = stick, a = A, b/p = B, s = SEL, 1-5 = knob, ? = this
+             - / + = knob -/+ 50 (100 mm/s),  quiet / loud = stop / restart $LINE
 ```
 
 ### Step 3. Race
@@ -111,8 +114,8 @@ Press **SEL** again to hand back to `control.c`.
 `capture.txt` and chart two fields of `$LINE`:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,2,-400,400
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,2,-400,400
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
 ```
 
 Field 2 is the controller's estimate of the line position, field 3 the world's
@@ -120,7 +123,10 @@ Field 2 is the controller's estimate of the line position, field 3 the world's
 
 **Guess first:** will they agree?
 
-> They agree in sign and roughly in size, but not exactly. The estimate is
+> They agree roughly in size but are **opposite in sign**, and not equal. Field 2
+> says where the line is (+ = the line is to the LEFT of the robot,
+> `control.h`); field 3 says where the robot is (+ = the robot is LEFT of the
+> line, `track_seg_dist()`). Flip one to compare them. The estimate is
 > made at the sensor bar, 70 mm ahead of the axle; the truth is measured at
 > the axle. In a corner the bar sees the curve before the robot's centre
 > reaches it, so the estimate *leads*. That lead is a free derivative term —
@@ -171,7 +177,7 @@ prints `$LAP,<track>,<ms>*CS`. At the end, save your serial monitor as
 `yourname.txt` in a shared folder and run:
 
 ```
-python host\leaderboard.py captures\*.txt
+uv run host\leaderboard.py captures\*.txt
 ```
 
 **The numbers to beat — measured on the host, default gains:**
@@ -209,7 +215,7 @@ df 1
 two wheel commands:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,4,-2000,2000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,4,-2000,2000
 ```
 
 Then `df 0.5` (the default), then `df 0.25`.
@@ -314,6 +320,47 @@ Pick one:
 > Whatever you pick, change only `control.c` (or `track.c` for a new track),
 > prove it on the host first — `host\run.bat` must still say `PASS` — and
 > only then load it on the chip.
+
+## Part 9 — Run it from the station (optional, 10 min)
+
+The OLED is 128 × 64 pixels; the station on the PC draws it as large as
+your window, and beside it the race **from above**: the whole track, the
+robot to scale with its seven sensor spots lit by what they read, the path it
+actually drove (red where the tyres slid), a close-up in the robot's own frame,
+and `$LINE` and `$LAP` as charts.
+
+**Do this:** start the simulation from **VS Code** (the Wokwi extension: its
+`wokwi.toml` forwards the serial port to TCP port 4000), then, from the
+repository root:
+
+```
+uv run tools/station/station.py
+```
+
+Click the station's picture and the keyboard is the app board:
+
+| Key | Does |
+|---|---|
+| arrows | the joystick: pick a track in the menu; drive in manual mode |
+| `a` | **A**: choose, start / stop |
+| `b` or `p` | **B**: next track |
+| `s` | **SEL**: manual ↔ auto |
+| `1` … `5` | the knob at 100, 300, 500, 700, 900 (200 … 1800 mm/s) — until the real knob is turned |
+| `-` / `+` | the knob 50 lower / higher (100 mm/s a press) |
+| `?` | prints this list |
+
+A key is held exactly as long as your finger is (the station sends key-down
+and key-up), so manual driving feels like a joystick, not a typewriter.
+Type `quiet` in the station's command line to stop `$LINE` (laps still
+print `$LAP`), `loud` to start it again.
+
+> The map's track shapes are copied from `track.c` into
+> `tools/station/views/l15_line.py`. A track you add in Part 8 is not in
+> that copy: the station then draws it from the robot's trail.
+>
+> **Not yet watched in Wokwi.** The keys, the mirror and the map were built
+> and tested on the PC only; if any of them misbehaves in the simulator,
+> write down what you saw.
 
 ---
 

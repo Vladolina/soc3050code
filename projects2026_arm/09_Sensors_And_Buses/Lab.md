@@ -34,7 +34,7 @@ simulate.bat
 Zero warnings:
 
 ```
-           FLASH:       11108 B        32 KB     33.90%
+           FLASH:       11152 B        32 KB     34.03%
              RAM:        7536 B        12 KB     61.33%
 ```
 
@@ -178,7 +178,7 @@ Let it run while you tilt back and forth for ten seconds. Copy the serial
 monitor's text into `capture.txt`, then use lesson 08's `host.py`:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart IMU,2,-16384,16384
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart IMU,2,-16384,16384
 ```
 
 > Field 2 of each `$IMU` frame is `ax`. `--chart` draws it as a bar scaled from

@@ -64,7 +64,7 @@ Arrow keys move, `o` gives an overview grid, `p` prints or saves as PDF.
 Re-render after editing any `Slide.md`:
 
 ```
-python projects2026_arm/_build/build-slides.py
+uv run projects2026_arm/_build/build-slides.py
 ```
 
 `_slides/` is generated. Edit the `Slide.md`, never the HTML.
@@ -86,7 +86,7 @@ Two files, one derived from the other:
 
 - `_targets/c031c6-pins.json` — the facts, committed. Derived from Wokwi's
   board definition (`wokwi/wokwi-boards`, `boards/st-nucleo-c031c6/board.json`)
-  by `python _build/wokwi-pins.py --refresh`. That repository declares no
+  by `uv run _build/wokwi-pins.py --refresh`. That repository declares no
   licence, so the board file itself is **not** vendored; only the name-to-pin
   facts are, in our own format.
 - `_slides/board-pins.html` — the page. `build-slides.py` renders it on every
@@ -112,9 +112,9 @@ From lesson 04 on, every deck opens with two generated slides, so students see
   is course knowledge, in the `LESSONS` table of `_build/pinmap.py`.
 
 ```
-python _build/pinmap.py              # after changing any diagram.json or LESSONS
-python _build/pinmap.py --refresh    # re-derive the layout facts from Wokwi
-python _build/build-slides.py        # then re-render
+uv run _build/pinmap.py              # after changing any diagram.json or LESSONS
+uv run _build/pinmap.py --refresh    # re-derive the layout facts from Wokwi
+uv run _build/build-slides.py        # then re-render
 ```
 
 A slide opts in with a ```` ```svg ```` block whose first line is the
@@ -380,6 +380,19 @@ every host test passes:
 | 17 | 23 960 / 10 144 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
 | 18 | 27 124 / 9 608 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
 | 19 | 16 648 / 10 280 | 15/15; the template's health and watchdog logic |
+| 12 | 19 304 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 50 bus bytes a frame against 1104 for a full repaint (games at half speed since 2026-11-03) |
+| 13 | 28 524 / 11 120 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
+| 14 | 29 600 / 10 776 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
+| 15 | 29 484 / 9 744 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
+| 16 | 31 100 / 11 584 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
+| 17 | 26 280 / 10 408 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
+| 18 | 29 244 / 9 872 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
+| 19 | 18 780 / 10 552 | 15/15; the template's health and watchdog logic |
+
+FLASH / RAM for 12-19 are the 2026-11-03 builds, after the station wiring
+(`kbd`, `mirror`, `keys`): 1.9-2.5 KB more flash and 250-600 B more RAM each.
+Lesson 16 now has 1.7 KB of flash and 704 B of RAM left; lesson 18's room for
+a student's `student.c` under its 29 KB line fell from ~2 KB to ~0.4 KB.
 
 **Wokwi does not implement DMA, IWDG, PWR or RTC** on this board, and WWDG is
 "implemented, not tested" ([Wokwi's board page](https://docs.wokwi.com/parts/board-st-nucleo-c031c6)).
@@ -436,6 +449,24 @@ _spike/f446re/   Nucleo F446RE (Cortex-M4F)  - builds, runs in Renode
 Each carries the three files that replace what avr-libc did for free:
 `startup.c` (vector table, reset handler, `.data`/`.bss` init, clock),
 `link.ld` (memory map), and a `main.c` that blinks and prints over USART2.
+
+## Setting up a PC (once)
+
+1. **Clone into a short folder** (`C:\work\`): the vendored SimulIDE has long
+   paths, and a deep folder makes the checkout fail (root README).
+2. **VS Code**, opened at the repository root. Accept the recommended
+   extensions - **Wokwi** simulates the lessons (activate its licence once).
+3. **uv**, once: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+   (or `winget install astral-sh.uv`), then in a new terminal at the root:
+   `uv sync`. That fetches Python 3.12 and every package the PC-side tools use.
+4. **Build before simulating**: the firmware is not in git. Open a lesson's
+   `Main.c` and press **Ctrl+Shift+B** (or run `build.bat` in its folder).
+5. **Simulate**: F1 → *Wokwi: Start Simulator* with the lesson's folder.
+6. **Station** (lessons 12-19): **Terminal → Run Task → ARM: Station**, or
+   `uv run tools/station/station.py`. Click the OLED; the keyboard is the board.
+
+Every Python command in these lessons is written `uv run X.py`; it works from
+any folder inside the repository.
 
 ## Building
 
@@ -496,10 +527,10 @@ nobody with a fresh clone can reproduce it. `_build/disasm.py` closes that gap
 by reading the ELF itself:
 
 ```
-pip install capstone
-python _build/disasm.py _spike/c031c6/Main.elf -f _write
-python _build/disasm.py _spike/c031c6/Main.elf            # the whole image
-python _build/disasm.py _spike/c031c6/Main.hex            # no symbols - see below
+uv sync                                                    # once: capstone comes with it
+uv run _build/disasm.py _spike/c031c6/Main.elf -f _write
+uv run _build/disasm.py _spike/c031c6/Main.elf            # the whole image
+uv run _build/disasm.py _spike/c031c6/Main.hex            # no symbols - see below
 ```
 
 capstone is a 3 MB wheel rather than a 335 MB toolchain download. The script
@@ -602,6 +633,24 @@ lesson's slide 33b:
 `debounce_step()` is inlined under `-Os`, but line breakpoints inside it still
 work: `-g3` keeps the line table. Whether Wokwi's GDB server accepts writes to
 peripheral registers has not been confirmed; Lab 05 Part 8 says so.
+
+## The station: the board's screen and keyboard on the PC (2026-11-03)
+
+The app board's OLED is 128 x 64 - too small to watch in a simulator window,
+and too small for a drone or a robot. So lessons 12-19 are watched and driven
+from **`tools/station/station.py`**, a ground station in one window: the OLED
+drawn large, the lesson's telemetry drawn at the PC's resolution (an artificial
+horizon, a map, a pendulum), and a console. Its keyboard sends real key-down
+and key-up as `$KEY` frames; `_lib/kbd.c` folds them into the same `pad_t`
+the pins fill. The OLED reaches the PC as `$FB` frames from `_lib/mirror.c`,
+sent only while the station asks. **The board computes; the PC draws** - the
+serial link carries state at a few KB/s, never pixels at PC resolution.
+
+Python and pyserial come from the course's uv environment (`uv sync` at the
+root). Each lesson's `wokwi.toml` forwards the UART as
+`rfc2217ServerPort = 4000`. `tools/station/fakeboard.py` stands in for a board.
+**Run against `fakeboard.py` only so far; never yet against Wokwi.** Details
+and the protocol: `tools/station/README.md`.
 
 ## Decisions
 

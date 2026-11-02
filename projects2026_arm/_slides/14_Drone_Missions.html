@@ -698,10 +698,10 @@ if (m == M_TAKEOFF || m == M_HOLD || m == M_MISSION) {
 </section>
 <section class="slide">
 <h2>Slide 22: <code>mission.py</code> — Plan, Send, Score</h2>
-<pre><code>python host\mission.py host\default.mission             frames to paste into Wokwi
-python host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
-python host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
-python host\mission.py --score capture.txt --race        score any captured flight</code></pre>
+<pre><code>uv run host\mission.py host\default.mission             frames to paste into Wokwi
+uv run host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
+uv run host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
+uv run host\mission.py --score capture.txt --race        score any captured flight</code></pre>
 <p>Scoring reads only telemetry, so it works on a Wokwi capture, a live log or<br>the host test&#x27;s log alike. It uses <code>$TRU</code> — <strong>the simulator&#x27;s truth</strong>, a frame<br>no real drone could send — because a flight is judged by where it went, not<br>where it believed it went.</p>
 <p><em>Measured on the host:</em> <code>--score</code> on the SITL&#x27;s windy flight agrees with the C<br>test&#x27;s own measurements — completion <strong>61.00 / 60.96 s</strong>, max cross-track<br><strong>2.07 / 2.06 m</strong>, worst waypoint <strong>1.74 / 1.75 m</strong>, landing <strong>0.45 / 0.44 m</strong><br>(C at 50 Hz / Python at the 5 Hz telemetry rate).</p>
 <p>Standard library only. <code>--port</code> needs pyserial, exactly as lesson 08&#x27;s<br><code>host.py --port</code> does; without it, print and paste.</p>
@@ -1245,12 +1245,13 @@ python host\mission.py --score capture.txt --race        score any captured flig
   <rect x="496" y="256" width="20" height="4" fill="currentColor"/>
 </svg></figure>
 <p>Map at 1.6 m per pixel with the dotted 50 m fence; waypoints as crosses, the<br>current one boxed, the legs dotted; breadcrumbs every 0.5 s; the drone a dot<br>with a heading tick. Panel: mode, progress (or the failsafe, prefixed <code>!</code>),<br>altitude, battery and its bar, wind, time since arming; the altitude bar&#x27;s<br>full scale is the 30 m ceiling.</p>
+<p><strong>On the PC, larger:</strong> <code>uv run tools/station/station.py</code> mirrors this screen<br>(<code>$FB</code>, sent only while the station asks) and draws <code>$POS</code> against <code>$TRU</code><br>as a full-window map; every control is a key (<code>- +</code> = cruise speed), and<br><code>quiet</code> / <code>loud</code> stop and restart the 5 Hz frames. A fourth lock,<br><code>kbd_lock</code>, guards the keys between <code>link</code> and <code>ui</code>. Not yet watched in Wokwi.</p>
 </section>
 <section class="slide">
 <h2>Slide 25: What It Costs — Flash and RAM</h2>
 <p>The first build of this lesson <strong>did not link</strong>: FLASH 30 736 B, RAM<br>12 576 B — <strong>102 %</strong> of the chip&#x27;s RAM. Three changes brought it home:</p>
 <table><thead><tr><th>Change</th><th>Saved</th><th>Why</th></tr></thead><tbody><tr><td>task stacks 384 → 160–320 words, sized per task</td><td>~2 KB RAM</td><td>a 384-word stack for a task that needs 100 is RAM nobody uses</td></tr><tr><td><code>fm.c</code>: sin, cos, atan2, sqrt compiled <strong>once</strong></td><td><strong>720 B</strong> flash</td><td><code>static inline</code> gave each of four files its own copies</td></tr><tr><td><code>say()</code> = <code>vsnprintf</code> + <code>_write</code>, no stdio stream</td><td><strong>1860 B</strong> flash</td><td><code>printf</code>/<code>fputs</code> to <code>stdout</code> drag in buffering, flushing, <code>malloc</code></td></tr></tbody></table>
-<p><em>Measured</em> with this tree&#x27;s <code>arm-none-eabi-gcc</code> by building each variant.<br>Final: <strong>FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)</strong>, zero warnings.</p>
+<p><em>Measured</em> with this tree&#x27;s <code>arm-none-eabi-gcc</code> by building each variant.<br>Final: <strong>FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)</strong>, zero warnings;<br>with the station&#x27;s keys and OLED mirror (slide 24) <strong>29 600 B (90.3 %),<br>10 776 B (87.7 %)</strong>.</p>
 <p>The stack sizes come from <code>-fstack-usage</code> plus the C library&#x27;s prologues (the<br><code>link</code> task&#x27;s deepest path, <code>ml_handle</code> → <code>vframe</code> → <code>vsnprintf</code>, is about<br>0.9 KB of its 1.25 KB).<br>They are <strong>estimates until the board runs</strong> — the <code>stats</code> command prints each<br>task&#x27;s high-water mark, and Lab Part 1 reads it.</p>
 </section>
 <section class="slide">

@@ -40,7 +40,7 @@ and sends those frames.
 ```
 build.bat        # FLASH 11868 B / 32 KB, RAM 6520 B / 12 KB, zero warnings
 simulate.bat
-python host.py --selftest
+uv run host.py --selftest
 ```
 
 ## Python and Wokwi — the three routes

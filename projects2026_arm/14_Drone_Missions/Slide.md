@@ -904,10 +904,10 @@ vehicle. A frame with a valid checksum is only *undamaged* — not *sensible*.
 ## Slide 22: `mission.py` — Plan, Send, Score
 
 ```
-python host\mission.py host\default.mission             frames to paste into Wokwi
-python host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
-python host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
-python host\mission.py --score capture.txt --race        score any captured flight
+uv run host\mission.py host\default.mission             frames to paste into Wokwi
+uv run host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
+uv run host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
+uv run host\mission.py --score capture.txt --race        score any captured flight
 ```
 
 Scoring reads only telemetry, so it works on a Wokwi capture, a live log or
@@ -1490,6 +1490,12 @@ with a heading tick. Panel: mode, progress (or the failsafe, prefixed `!`),
 altitude, battery and its bar, wind, time since arming; the altitude bar's
 full scale is the 30 m ceiling.
 
+**On the PC, larger:** `uv run tools/station/station.py` mirrors this screen
+(`$FB`, sent only while the station asks) and draws `$POS` against `$TRU`
+as a full-window map; every control is a key (`- +` = cruise speed), and
+`quiet` / `loud` stop and restart the 5 Hz frames. A fourth lock,
+`kbd_lock`, guards the keys between `link` and `ui`. Not yet watched in Wokwi.
+
 ---
 
 ## Slide 25: What It Costs — Flash and RAM
@@ -1504,7 +1510,9 @@ The first build of this lesson **did not link**: FLASH 30 736 B, RAM
 | `say()` = `vsnprintf` + `_write`, no stdio stream | **1860 B** flash | `printf`/`fputs` to `stdout` drag in buffering, flushing, `malloc` |
 
 *Measured* with this tree's `arm-none-eabi-gcc` by building each variant.
-Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings.
+Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings;
+with the station's keys and OLED mirror (slide 24) **29 600 B (90.3 %),
+10 776 B (87.7 %)**.
 
 The stack sizes come from `-fstack-usage` plus the C library's prologues (the
 `link` task's deepest path, `ml_handle` → `vframe` → `vsnprintf`, is about

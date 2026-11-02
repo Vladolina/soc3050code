@@ -19,11 +19,14 @@ you race it, draw your own maze for it, and finally take its goal away.
 Each part says **Do this**, asks you to **guess**, then explains **what you
 see and why**. Nothing is marked or collected.
 
-Two places to run everything:
+Three places to run everything:
 
 - **Wokwi** — the board, the OLED, the buttons. `simulate.bat`.
 - **The host** — the same `world.c`, `nav.c`, `astar.c` compiled for your PC,
   every level in a second: `host\run.bat` (or `bash host/run.sh`).
+- **The station** (optional) — Wokwi in VS Code plus
+  `uv run tools/station/station.py`: the robot's map drawn as large as your
+  window, and your keyboard as the pad. See the end of Part 0.
 
 Predictions marked *host* were measured by `host\run.bat`. Predictions about
 what the OLED, the buzzer or the buttons do **have not been watched in Wokwi
@@ -46,8 +49,8 @@ simulate.bat
 Zero warnings, and close to:
 
 ```
-           FLASH:       29216 B        32 KB     89.16%
-             RAM:       11328 B        12 KB     92.19%
+           FLASH:       31100 B        32 KB     94.91%
+             RAM:       11584 B        12 KB     94.27%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the OLED, joystick,
@@ -64,7 +67,7 @@ Simulation…** → `Main.elf`. The banner:
 
 ### Guess first
 
-89% of flash and 92% of RAM. Where did it all go — the robot, the world, or
+95% of flash and 94% of RAM. Where did it all go — the robot, the world, or
 the C library?
 
 > **What you see and why.** Slide 23 has the answer, measured: the first
@@ -72,6 +75,28 @@ the C library?
 > C library — one `strtok()` call linked malloc, assert and fprintf, 3 KB —
 > and half was measuring the stacks instead of guessing them. The robot's
 > whole brain is 3288 B of RAM. Keep these two numbers in mind for Part 7.
+> (Without the station's keys and OLED mirror it is 89% and 92%: those two
+> cost 1884 B of flash and 256 B of RAM.)
+
+### Optional: run it from the station
+
+Start the simulation from VS Code (it reads `wokwi.toml`, which forwards the
+serial port to `rfc2217://localhost:4000`), then from the repository root:
+
+```
+uv run tools/station/station.py
+```
+
+The first `$NAV` frame picks this lesson's view: the robot's own map, its plan,
+the true pose (green) beside the estimate (blue), the counters - and beside it
+the OLED, copied over as `$FB` frames. Click the view and your keys are the pad:
+arrows = stick, `a` = A, `b` = B, `s` = SEL, `1`-`5` = knob, `?` lists them.
+The view asks for a `dump` when it starts, on a new level and when a run ends;
+type `dump` in its console for a fresh map mid-run, `quiet` / `loud` to stop
+and restart `$NAV`. Every later part works the same from here.
+
+**Not yet watched in Wokwi** - if the map, the keys or the mirror misbehave,
+write down what you saw.
 
 ---
 
@@ -149,7 +174,7 @@ With no keep-away cost the plan hugs every wall. Will the robot crash?
 
 > **What you see and why.** Barely, *with the brake on*: *host* says
 > 0.04 collisions per run at `inflate 0` vs 0.00 at 1 — the reactive layer
-> catches what the planner risks. Now try `python host\planner.py --level 4
+> catches what the planner risks. Now try `uv run host\planner.py --level 4
 > --inflate 0` and `--inflate 1`: the same path, but cost 532 vs 1100 —
 > every cell of a 2-wide corridor touches a wall, so inflation cannot choose
 > a "middle" that does not exist. The margin only matters when the brake is
@@ -190,8 +215,8 @@ The planner still knows where the walls are. How many collisions per run?
 `capture.txt` when it arrives, then:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart NAV,11,0,30
-python host\planner.py --file capture.txt
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart NAV,11,0,30
+uv run host\planner.py --file capture.txt
 ```
 
 ### Guess first
@@ -213,14 +238,14 @@ robot find out it is shut?
 
 ### Do this
 
-1. `python host\planner.py --level 3` — the same A*, in Python, with the
+1. `uv run host\planner.py --level 3` — the same A*, in Python, with the
    path drawn.
 2. Make a map: copy the level-3 picture into `mine.txt` (14 lines of 32
    characters, `#` wall, `.` floor, one `S`, one `G`), change it, then
-   `python host\planner.py --map mine.txt --frames`.
+   `uv run host\planner.py --map mine.txt --frames`.
 3. Paste the frames into the serial monitor one at a time. Press A.
 4. While it drives, type `dump`, copy everything into `capture.txt`, and run
-   `python host\planner.py --file capture.txt`.
+   `uv run host\planner.py --file capture.txt`.
 
 ### Guess first
 

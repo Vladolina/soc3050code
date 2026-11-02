@@ -75,8 +75,8 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       27496 B        32 KB     83.91%
-             RAM:       10520 B        12 KB     85.61%
+           FLASH:       29600 B        32 KB     90.33%
+             RAM:       10776 B        12 KB     87.70%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board), then
@@ -87,9 +87,12 @@ Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board), then
   pad      : joystick, knob, A/B/SEL
   OLED     : 0x3C answered
   drone    : simulated in this chip - world 100 Hz, control 50 Hz, GPS 10 Hz
+  press A to fly the built-in mission, or paste mission.py's frames
+  shell    : stats  params  mission  tel  quiet  loud
+  station  : uv run tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?
 ```
 
-then `$POS` and `$TRU` frames five times a second. Type `tel` to silence them,
+then `$POS` and `$TRU` frames five times a second. Type `tel` (or `quiet`; `loud` brings them back) to silence them,
 `stats` to see the budget.
 
 **Guess first:** slide 26 predicts "a few hundred µs" for one
@@ -127,7 +130,7 @@ Copy the whole serial monitor into `capture.txt` when it lands (`DISARMED`),
 and score it:
 
 ```
-python mission.py --score ..\capture.txt --race
+uv run mission.py --score ..\capture.txt --race
 ```
 
 > **Predicted from the host:** `sitl --fly 5` flies this mission in 5 m/s in
@@ -173,7 +176,7 @@ are all fair game.
 
 **In Wokwi (not watched):** fly to HOLD (press A, then the joystick button),
 turn the knob to 1000 (10 m/s) and paste `$PARAM,KI_VEL,0*..` — build the
-frame with `python ..\..\08_UART_And_Python_Host\host.py --frame "PARAM,KI_VEL,0"`.
+frame with `uv run ..\..\08_UART_And_Python_Host\host.py --frame "PARAM,KI_VEL,0"`.
 The drone on the map should slide downwind and stop about 1.5–2 m away.
 
 ---
@@ -211,10 +214,10 @@ an estimate that is updated ten times a second?
 Then fly it on the PC and score it:
 
 ```
-python mission.py --gen figure8 25 8 12 > my8.mission
-python mission.py my8.mission > my8.txt
+uv run mission.py --gen figure8 25 8 12 > my8.mission
+uv run mission.py my8.mission > my8.txt
 out\sitl --fly 8 my8.txt
-python mission.py --score out\fly.log --race
+uv run mission.py --score out\fly.log --race
 ```
 
 **Guess first:** where on the 8 will the cross-track error be worst — on the
@@ -284,9 +287,9 @@ waypoints, unchanged) in **8 m/s wind, seed 1**, as fast as you can, while
 Break any rule and the time does not count. Change only parameters:
 
 ```
-python mission.py default.mission > race.txt
+uv run mission.py default.mission > race.txt
 out\sitl --fly 8 race.txt CRUISE=500
-python mission.py --score out\fly.log --race
+uv run mission.py --score out\fly.log --race
 ```
 
 **Beat these** (measured on the host):
@@ -314,7 +317,7 @@ still.)
 an RFC 2217 port, so
 
 ```
-python mission.py default.mission --port rfc2217://localhost:4000 --log flight.log
+uv run mission.py default.mission --port rfc2217://localhost:4000 --log flight.log
 ```
 
 sends each frame, **waits for its `$ACK`**, resends up to three times, and
@@ -331,6 +334,38 @@ for ACKs. On a radio link that loses one frame in twenty:
    if the *ground station* restarts halfway?)
 3. Add `$MISSION,COUNT,n` to `mavlite.c` so `START` is refused unless exactly
    `n` waypoints arrived. Test it on the host with `sitl --parse`.
+
+---
+
+## Part 9 — Fly it from the station (optional, 15 min)
+
+`tools/station/station.py` shows the OLED large, sends every control as a
+key, and draws this lesson's telemetry as a full-window map. Start the Wokwi
+simulation from VS Code, then from the repository root:
+
+```
+uv run tools/station/station.py
+```
+
+Click the picture so the keyboard belongs to the board: **arrows** = stick,
+**a** = A, **b** = B, **s** = SEL (HOLD), **1-5** = the knob (wind 1, 3, 5, 7, 9 m/s),
+**- / +** = cruise speed down / up 1 m/s, **?** = the list. Type `quiet` in
+the station's command line to stop `$POS`/`$TRU` (events still come), `loud`
+to restart them.
+
+1. Press **a**. On the map, the blue track is what the drone **believes**
+   (`$POS`), the orange one what is **true** (`$TRU`). Where do they part
+   most - on the straight legs or in the turns? Read the estimate-error
+   chart beside it and compare with the 0.68 m RMS the host measured.
+2. Press **5** for a 9 m/s gale, then **s** to HOLD, and steer the hold
+   point with the arrows. Which way does the true track sit from the
+   estimate, and why (slide 14)?
+3. Press **+** three times before **a**. Does the race time drop as much as
+   the cruise speed rose? What does the cross-track error do?
+
+> **Not watched yet.** The station route has been built and its view tested
+> on the PC against the SITL's own frames, but nobody has flown the lesson
+> from it in Wokwi. Record what you see.
 
 ---
 

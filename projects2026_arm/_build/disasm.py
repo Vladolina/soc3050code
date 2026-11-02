@@ -5,9 +5,9 @@
 it. But the toolchain is not vendored yet (see the README), which leaves anyone
 with a fresh clone unable to look at the very listings the Part 0 slides quote.
 This reads the ELF directly and disassembles it with capstone, which is a 3 MB
-pip install rather than a 335 MB download:
+package in the course's uv environment rather than a 335 MB download:
 
-    pip install capstone
+    uv sync                      (once, at the repository root)
     python _build/disasm.py _spike/c031c6/Main.elf
     python _build/disasm.py _spike/c031c6/Main.elf -f _write
     python _build/disasm.py _spike/c031c6/Main.hex --base 0x08000000
@@ -34,7 +34,7 @@ import sys
 try:
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_LITTLE_ENDIAN
 except ImportError:
-    sys.exit("capstone is not installed.  pip install capstone")
+    sys.exit("capstone is not installed: run  uv sync  at the repository root")
 
 STT_FUNC = 2
 SHF_EXECINSTR = 0x4

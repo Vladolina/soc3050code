@@ -20,33 +20,54 @@ PC to measure everything this README quotes.
 | | |
 |---|---|
 | `Slide.md` | the lecture - 31 pages as rendered: the title, the two pin-map slides, then the numbered slides, each register block's one-page map before its details |
-| `Lab.md` | the lab: nine parts, ~2 hours, a leaderboard, **nothing handed in** |
+| `Lab.md` | the lab: ten parts (the last, the station, optional), ~2 hours, a leaderboard, **nothing handed in** |
 | `control.h` | **the contract**: `sensors_t`, `actuators_t`, `control_step()`, the tunable gains |
 | `control.c` | **the student's file**: weighted-average line position, PID, corner slow-down, gap / overshoot / crossing handling |
 | `world.c`, `world.h` | the robot and the judge: motors (τ 40 ms, 8 m/s²), friction circle (0.7 g), encoders, sensor synthesis with ambient and noise, laps, DNF |
 | `track.c`, `track.h` | four tracks as turtle programs (OVAL, S-BENDS, HAIRPINS, FIGURE-8 with a crossing and a gap), built into ≤ 1 mm polylines |
 | `view.c`, `view.h` | the OLED: track drawn once, robot as an XOR triangle, lap times, sensor bars |
-| `Main.c` | five RTOS tasks, the shared-data rules, `$LINE`/`$LAP` telemetry, the shell, on-chip cycle counting |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json` |
+| `Main.c` | five RTOS tasks, the shared-data rules, `$LINE`/`$LAP` telemetry, the shell, on-chip cycle counting, the station's keys (`$KEY`) and OLED mirror (`$FB`) |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror` - the last three are the station's keyboard and OLED mirror |
+| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json`; `wokwi.toml` forwards the serial port to TCP 4000 for the station |
 | `host/sitl.c`, `host/run.bat`, `host/run.sh` | **the host test**: nine measured tables, exit 1 on failure; also `race` and `ascii` modes |
 | `host/leaderboard.py` | ranks `$LAP` frames from students' serial captures, checksum-verified (standard library only) |
 | `.gitignore` | keeps `host/sitl.exe` out of git |
+| `tools/station/views/l15_line.py` | (outside this folder) the station's view: the race from above, sensor bar, charts, laps |
 
 ## Build and run
 
 ```
-build.bat        # FLASH 26988 B / 32 KB, RAM 9352 B / 12 KB, zero warnings
+build.bat        # FLASH 29484 B / 32 KB, RAM 9744 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
-python host\leaderboard.py captures\*.txt
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run host\leaderboard.py captures\*.txt
 ```
 
 Controls: menu — joystick up/down, **A** to choose. Race — **A** start / stop
 (back to the line), **B** next track, **SEL** manual ↔ auto, knob = speed
 (0–2000 mm/s). Shell: `kp ki kd df slow thr N`, `noise ambient fail N`,
-`gains`, `stats`.
+`gains`, `stats`, `quiet` / `loud` (stop / restart `$LINE`; `$LAP` stays).
+
+### Run it from the station
+
+Start the simulation from VS Code (`wokwi.toml` carries
+`rfc2217ServerPort = 4000`), then `uv run tools/station/station.py` from
+the repository root. The OLED appears large, and beside it the race from
+above (`tools/station/views/l15_line.py`): the track, the robot to scale with
+its sensor spots, the path it drove, a close-up in the robot's frame, the
+sensor bar, error and wheel-command charts, and every `$LAP`. Keys: arrows =
+stick, `a` = A, `b`/`p` = B, `s` = SEL, `1`-`5` = knob, `-`/`+` = knob -/+ 50
+(100 mm/s), `?` = the list. `quiet` / `loud` in the station's command line.
+
+`$LINE` grew eleven fields **at the end** for that map - true `x`, `y` (mm),
+heading (degrees, 0 = east, + = anticlockwise), track 1-4, and the seven
+readings, rightmost first - so the first eight, and `host.py --chart LINE,3`,
+are unchanged; `leaderboard.py` reads only `$LAP`. The track shapes are
+**not** sent: the view rebuilds them from a copy of `track.c`'s turtle
+commands, checked point for point against `track_build()` (all four within
+1 mm, gaps identical). Change a track and that copy is stale; a track id it
+does not know is drawn from the robot's trail. **Not yet watched in Wokwi.**
 
 ### Stacks
 
@@ -55,10 +76,18 @@ of RAM**, 95% of the chip. The stacks were then sized from
 `arm-none-eabi-gcc -fstack-usage` for this lesson's and `_lib`'s code, plus
 newlib-nano's printf frames read from the disassembly (`_svfprintf_r` /
 `_vfprintf_r` 144 B, `_vsnprintf_r` 120 B, `_printf_i` 64 B). Deepest chains:
-`ui` ≈ 680 B (`send_frame` → `vsnprintf`), `display` ≈ 670 B (`oled_printf`),
+`ui` ≈ 680 B (`send_frame` → `vsnprintf`; ≈ 790 B since `$LINE` grew - see below), `display` ≈ 670 B (`oled_printf`),
 `world` ≈ 330 B (`world_reset` → `track_build`). Each got its chain, 64 B for
 the exception and context-switch frames, and roughly a third spare:
 world 160, control 160, ui 256, shell 224, display 256 words. **RAM 9 352 B.**
+
+The station (2026-11) moved three of those figures. The longer `$LINE`
+frame grew `task_ui`'s own frame 120 → 184 B and `send_frame`'s 96 → 144 B,
+so `ui` went to **288 words** to keep about a quarter spare. `display` also
+builds a `$FB` frame after each flush (`mirror_next` 40 B + `build` 128 B +
+`snprintf`, ≈ 710 B deep with its own frame) and stayed at 256; its 96-byte
+frame buffer is `static`, not on the stack. `kbd_t` and the mirror's hashes
+add ~170 B of `.bss`. **RAM 9 744 B.** Read `stats` before trusting this.
 `stats` prints the real high-water marks; check them before shrinking.
 
 ## Facts checked against sources, not memory
@@ -98,7 +127,10 @@ world 160, control 160, ui 256, shell 224, display 256 words. **RAM 9 352 B.**
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 26 988 B, RAM 9 352 B.
+- **Builds with zero warnings**: FLASH 29 484 B, RAM 9 744 B.
+- **The station route** (`$KEY` keys, `$FB` mirror, `quiet`/`loud`, the
+  `l15_line.py` view) is built and its view tested on the PC with frames
+  from the real `world.c`; **not yet watched in Wokwi**.
 - **Host test passes** with the numbers above.
 - **Not yet watched running in Wokwi.** Nothing on the chip side — timing,
   the display, the buttons, the beeps — has been seen. The first three things

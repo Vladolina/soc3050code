@@ -37,7 +37,25 @@ and the clone is unusable. If you must clone deep, enable long paths first:
 git config --global core.longpaths true
 ```
 
-Nothing else needs installing: both compilers and SimulIDE are in `tools/`.
+Nothing else needs installing to build: both compilers and SimulIDE are in
+`tools/`. Two things are not in the repository, for the ARM lessons only:
+
+- the **Wokwi** VS Code extension, which simulates them - VS Code offers it
+  when you open the folder, and it asks you to activate a licence once;
+- **uv**, which brings Python and every package the course's PC-side tools
+  use (the station, the lessons' host scripts). Install it once:
+  `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+  (or `winget install astral-sh.uv`), then at the repository root:
+
+  ```
+  uv sync
+  ```
+
+  `pyproject.toml`, `uv.lock` and `.python-version` pin it all: Python 3.12
+  (with the tkinter the station needs), pyserial, matplotlib, capstone.
+  Run a tool with `uv run`, e.g. `uv run tools/station/station.py`, or use
+  **Terminal → Run Task → ARM: Station**. The previous edition's Python
+  track has its own group: `uv sync --group legacy`.
 
 Then open any file under `projects2026_avr/01_Port_Basic/` and press
 **Ctrl+Shift+B** to build, or run **Terminal → Run Task → Simulate Current
@@ -122,7 +140,7 @@ Each lesson folder holds `Main.c`, `config.h`, `Slide.md`, `README.md`,
 Every lesson has a `Slide.md`. To turn all 25 into presentable HTML decks:
 
 ```
-python projects2026_avr\_build\build-slides.py
+uv run projects2026_avr\_build\build-slides.py
 ```
 
 Open `projects2026_avr/_slides/index.html`. Arrow keys or space to move, `o`

@@ -677,7 +677,7 @@ m[3] = th + r - u_p + u_y;      /* RL, CCW  */</code></pre>
 </section>
 <section class="slide">
 <h2>Slide 20: Five Tasks on One Core</h2>
-<table><thead><tr><th>Task</th><th>Rate</th><th>Priority</th><th>Does</th></tr></thead><tbody><tr><td>world</td><td>500 Hz</td><td>5 (most urgent)</td><td><code>world_step</code> + <code>world_sense</code> → <code>g_sens</code></td></tr><tr><td>ctrl</td><td>250 Hz</td><td>4</td><td><code>g_sens</code> → <code>control_step</code> → <code>g_act</code></td></tr><tr><td>pilot</td><td>50 Hz</td><td>3</td><td>joystick, buttons, knob, throttle ramp, <code>$ATT</code> at 25 Hz, beeps</td></tr><tr><td>shell</td><td>on input</td><td>2</td><td><code>stats</code>, <code>alpha</code>, <code>aw</code>, <code>mix</code>, <code>kick</code>, <code>hold</code></td></tr><tr><td>disp</td><td>15 Hz</td><td>1</td><td>horizon, motor bars, flush to the OLED</td></tr></tbody></table>
+<table><thead><tr><th>Task</th><th>Rate</th><th>Priority</th><th>Does</th></tr></thead><tbody><tr><td>world</td><td>500 Hz</td><td>5 (most urgent)</td><td><code>world_step</code> + <code>world_sense</code> → <code>g_sens</code></td></tr><tr><td>ctrl</td><td>250 Hz</td><td>4</td><td><code>g_sens</code> → <code>control_step</code> → <code>g_act</code></td></tr><tr><td>pilot</td><td>50 Hz</td><td>3</td><td>joystick, buttons, knob, throttle ramp, <code>$ATT</code> at 25 Hz, beeps</td></tr><tr><td>shell</td><td>on input</td><td>2</td><td><code>stats</code>, <code>alpha</code>, <code>aw</code>, <code>mix</code>, <code>kick</code>, <code>hold</code>, <code>quiet</code>, <code>loud</code>; the station&#x27;s <code>$KEY</code> / <code>$MIRROR</code></td></tr><tr><td>disp</td><td>15 Hz</td><td>1</td><td>horizon, motor bars, flush to the OLED, then up to 2 <code>$FB</code> mirror frames</td></tr></tbody></table>
 <p>The physics is the most urgent task because physics waits for nobody. The<br>structs cross between tasks inside two-line critical sections (lesson 03&#x27;s<br>tearing):</p>
 <pre class="lang-c"><code>__disable_irq(); in = g_sens; __enable_irq();</code></pre>
 <p>A whole <code>sensors_t</code> is 52 bytes — a torn copy would pair this step&#x27;s gyro<br>with last step&#x27;s accelerometer.</p>
@@ -842,8 +842,9 @@ for (int x = 1; x &lt; 63; x++) {
 <p>Every 40 ms, a lesson 08 frame with its checksum:</p>
 <pre><code>$ATT,&lt;ms&gt;,&lt;roll&gt;,&lt;pitch&gt;,&lt;roll set&gt;,&lt;pitch set&gt;,&lt;true roll&gt;,&lt;true pitch&gt;,&lt;M0&gt;,&lt;M1&gt;,&lt;M2&gt;,&lt;M3&gt;,&lt;armed&gt;,&lt;Kp x100&gt;*CS</code></pre>
 <p>Angles in tenths of a degree, motors in thousandths — integers, because<br><code>printf</code> here has no float support. In MPU mode it is<br><code>$EST,&lt;ms&gt;,&lt;roll&gt;,&lt;pitch&gt;,&lt;accel-only roll&gt;,&lt;accel-only pitch&gt;</code>.</p>
-<pre><code>python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300</code></pre>
+<pre><code>uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300</code></pre>
 <p>charts the estimated roll (field 2) from a capture; field 6 is the truth.<br>Chart both in turn and you have slide 11&#x27;s error, from the simulator, by<br>hand.</p>
+<p>Live instead: <code>uv run tools/station/station.py</code> draws the same frames as a<br>window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and<br>sends keys for every control; <code>quiet</code> / <code>loud</code> stop and restart <code>$ATT</code>. Not<br>yet watched in Wokwi.</p>
 </section>
 <section class="slide">
 <h2>Slide 26: What Was Measured — and What Could Not Be</h2>

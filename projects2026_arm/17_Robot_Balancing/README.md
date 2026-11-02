@@ -15,7 +15,8 @@ button: PID on tilt, cascaded PID, or LQR. The LQR gain is computed by
 `host/lqr.py` — standard library Python that parses the same `params.h`,
 linearises, discretises, iterates the Riccati equation and proves the result
 stable. The OLED draws the robot from the side with a tilt strip chart; `$BAL`
-frames go to lesson 08's `host.py`.
+frames go to lesson 08's `host.py`, or to the PC's station
+(`tools/station/station.py`), which draws the robot large and sends keys.
 
 ## Files
 
@@ -28,28 +29,57 @@ frames go to lesson 08's `host.py`.
 | `control.c` | **subject.** Complementary filter, encoder + tilt position, command slew, failsafe, PID tilt / cascade / LQR (`LQR_K` pasted from `lqr.py`) |
 | `world.c`, `world.h` | **subject.** The plant: Lagrange equations, motor model, semi-implicit Euler at 1 kHz, payload, push, sensor synthesis with a seeded xorshift32 |
 | `view.c`, `view.h` | the OLED scene: ground ticks, wheel with spoke, body at the tilt, payload, target caret, tilt history, FALLEN box. Pure C on `oled.h` |
-| `Main.c` | five RTOS tasks (world 1 kHz, control 200 Hz, ui 50 Hz, shell, display 10 Hz), single-writer request variables, TIM14 microsecond stopwatch, `$BAL` telemetry, shell `stats mode noise alpha vbat push k` |
+| `Main.c` | five RTOS tasks (world 1 kHz, control 200 Hz, ui 50 Hz, shell, display 10 Hz), single-writer request variables, TIM14 microsecond stopwatch, `$BAL` telemetry, shell `stats mode noise alpha vbat push k quiet loud`; the station's `$KEY` lines into the pad (`kbd`, one mutex for the shell and ui tasks), `$FB` OLED mirror frames from the display task |
 | `host/lqr.py` | LQR design and checks: A, B from `params.h`; ZOH `expm`; DARE by iteration; eigenvalues (Faddeev-LeVerrier + Durand-Kerner) and a power-iteration cross-check; linear recovery from 6°; `--check control.c`; `--pid KP,KI,KD` tilt-only analysis; `--Q --R --payload` |
 | `host/sitl.c` | the host verification: the firmware's own `world.c`, `control.c`, `view.c` and `_lib/oled.c` on a PC; `--trace MODE [push\|drive\|tilt]` CSV |
 | `host/run.sh`, `host/run.bat` | run `lqr.py --check`, then compile and run `sitl` with plain `gcc`; non-zero exit on failure |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json` — the robot needs no parts |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror` |
+| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json` — the robot needs no parts; `wokwi.toml` forwards USART2 to `rfc2217://localhost:4000` for the station |
+| `tools/station/views/l17_balance.py` | the station's view of `$BAL` (outside this folder) |
 
 **No shared file was changed.**
 
 ## Build and run
 
 ```
-build.bat        # FLASH 23960 B / 32 KB, RAM 10144 B / 12 KB, zero warnings
+build.bat        # FLASH 26280 B / 32 KB, RAM 10408 B / 12 KB, zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf
 host\run.bat     # or: bash host/run.sh  - exits 0, "all checks passed"
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
 ```
 
 Controls: joystick up/down drives (±0.4 m/s), **space** (SEL) cycles the
 controller, **a** stands the robot up, **b** pushes it, the knob loads it
 (0-0.6 kg at 20 cm). `$BAL` fields: ms, mode, true tilt (mdeg), estimated
 tilt (mdeg), x (mm), speed (mm/s), motor mV, fallen, payload (g).
+
+## Run it from the station
+
+The PC's ground station draws the robot large instead of on a 128 x 64 panel:
+
+```
+simulate.bat                          # Wokwi in VS Code; wokwi.toml forwards USART2 to port 4000
+uv run tools/station/station.py       # from the repository root
+```
+
+The first `$BAL` frame selects `tools/station/views/l17_balance.py`: the robot
+from the side at the **true** tilt, the controller's **estimated** tilt as a
+dashed ghost on the same axle, the wheel rolling along a ground with a tick
+every 10 cm, and strip charts of true vs estimated tilt, the motor volts and
+the position, under the controller's name. `$BAL` is only 10 Hz; the view does
+not interpolate between frames (that would cost a frame of lag) but eases the
+picture toward the latest one over ~50 ms, and the charts plot the frames as
+they arrived. The station's OLED pane is the board's own screen, sent by
+`mirror` as `$FB` frames after each `oled_flush()`.
+
+Keys, held as long as the key is held: arrows drive, `a` stands it up, `b` or
+`p` pushes, `s` cycles the controller, `1`-`5` set the payload in fifths,
+`-` / `+` make button B's push 50 mN s smaller / bigger (this lesson has no
+pace to slow), `?` lists them. The shell words `quiet` and `loud` stop and
+restart `$BAL`. `$KEY` and `$MIRROR` lines never get an answer.
+
+**The station route has not yet been watched in Wokwi.** The firmware builds
+and the view was exercised headless with synthetic `$BAL` frames only.
 
 ## Facts checked against sources, not memory
 
@@ -103,7 +133,7 @@ high-water marks, I²C timing — and anything about Wokwi.
 
 ## Status
 
-Builds with **zero warnings** (FLASH 23 960 B, RAM 10 144 B). The host
+Builds with **zero warnings** (FLASH 26 280 B, RAM 10 408 B). The host
 verification passes and its numbers are quoted above and in the deck, each
 labelled *measured on the host*.
 

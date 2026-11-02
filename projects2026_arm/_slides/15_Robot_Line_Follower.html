@@ -447,9 +447,9 @@ void control_step(const sensors_t *in, actuators_t *out);   /* at 100 Hz    */</
 </section>
 <section class="slide">
 <h2>Slide 4: Five Tasks, Five Rates</h2>
-<table><thead><tr><th>Task</th><th>Prio</th><th>Period</th><th>Job</th><th>Stack (words)</th></tr></thead><tbody><tr><td><code>world</code></td><td>5</td><td>5 ms</td><td><code>world_step()</code> + <code>world_sense()</code></td><td>160</td></tr><tr><td><code>control</code></td><td>4</td><td>10 ms</td><td><code>control_step()</code>, or the joystick in manual</td><td>160</td></tr><tr><td><code>ui</code></td><td>3</td><td>20 ms</td><td><code>pad_read()</code>, buttons, beeps, <code>$LINE</code> at 10 Hz, <code>$LAP</code></td><td>256</td></tr><tr><td><code>shell</code></td><td>2</td><td>on input</td><td><code>kp ki kd df slow thr</code>, <code>noise ambient fail</code>, <code>gains</code>, <code>stats</code></td><td>224</td></tr><tr><td><code>display</code></td><td>1</td><td>100 ms</td><td>the OLED: robot, laps, sensor bar</td><td>256</td></tr></tbody></table>
+<table><thead><tr><th>Task</th><th>Prio</th><th>Period</th><th>Job</th><th>Stack (words)</th></tr></thead><tbody><tr><td><code>world</code></td><td>5</td><td>5 ms</td><td><code>world_step()</code> + <code>world_sense()</code></td><td>160</td></tr><tr><td><code>control</code></td><td>4</td><td>10 ms</td><td><code>control_step()</code>, or the joystick in manual</td><td>160</td></tr><tr><td><code>ui</code></td><td>3</td><td>20 ms</td><td><code>pad_read()</code> + the station&#x27;s keys, buttons, beeps, <code>$LINE</code> at 10 Hz, <code>$LAP</code></td><td>288</td></tr><tr><td><code>shell</code></td><td>2</td><td>on input</td><td><code>kp ki kd df slow thr</code>, <code>noise ambient fail</code>, <code>gains</code>, <code>stats</code>, <code>quiet loud</code>; <code>$KEY</code> / <code>$MIRROR</code></td><td>224</td></tr><tr><td><code>display</code></td><td>1</td><td>100 ms</td><td>the OLED: robot, laps, sensor bar; <code>$FB</code> copies for the station</td><td>256</td></tr></tbody></table>
 <p><strong>Rate-monotonic</strong>: the shorter the period, the higher the priority (lesson<br>07). The world must never be late — a late physics step is a robot that<br>teleports. The display is the opposite: it gets whatever time is left, and<br>the I²C driver is polled, so its flush <em>is</em> CPU time.</p>
-<p>Stacks are sized from <code>gcc -fstack-usage</code> plus newlib&#x27;s printf frames (the<br>deepest chain is <code>send_frame()</code> → <code>vsnprintf()</code> → <code>_svfprintf_r</code>, ~460 bytes),<br>then checked live with <code>stats</code>. The build: <strong>FLASH 26 988 B, RAM 9 352 B</strong>.</p>
+<p>Stacks are sized from <code>gcc -fstack-usage</code> plus newlib&#x27;s printf frames (the<br>deepest chain is <code>send_frame()</code> → <code>vsnprintf()</code> → <code>_svfprintf_r</code>, ~510 bytes),<br>then checked live with <code>stats</code>. The build: <strong>FLASH 29 484 B, RAM 9 744 B</strong>.</p>
 </section>
 <section class="slide">
 <h2>Slide 5: Model 1 — Differential Drive</h2>
@@ -761,12 +761,14 @@ static const turtle_t oval[] = {
 </section>
 <section class="slide">
 <h2>Slide 25: Telemetry and the Leaderboard</h2>
-<pre><code>$LINE,&lt;ms&gt;,&lt;est x10&gt;,&lt;true x10&gt;,&lt;cmd L&gt;,&lt;cmd R&gt;,&lt;speed&gt;,&lt;s&gt;,&lt;slip&gt;*CS     10 Hz
+<pre><code>$LINE,&lt;ms&gt;,&lt;est x10&gt;,&lt;true x10&gt;,&lt;cmd L&gt;,&lt;cmd R&gt;,&lt;speed&gt;,&lt;s&gt;,&lt;slip&gt;,
+      &lt;x&gt;,&lt;y&gt;,&lt;heading&gt;,&lt;track&gt;,&lt;line 0&gt;..&lt;line 6&gt;*CS                   10 Hz
 $LAP,&lt;track&gt;,&lt;ms&gt;*CS                                                      every auto lap</code></pre>
 <p><code>est</code> is what the controller <em>believed</em> (<code>ctl_state.pos</code>), <code>true</code> what the<br>world <em>knows</em>. Plot both and the gap between them is your sensor model:</p>
-<pre><code>python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
-python host\leaderboard.py captures\*.txt</code></pre>
+<pre><code>uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run host\leaderboard.py captures\*.txt</code></pre>
 <p><code>leaderboard.py</code> checks every <code>$LAP</code> checksum, keeps each student&#x27;s best lap<br>per track, and ranks them. Manual laps are printed but never framed: the<br>leaderboard ranks <strong>controllers</strong>, not thumbs.</p>
+<p>The fields after <code>&lt;slip&gt;</code> are for the <strong>station</strong><br>(<code>uv run tools/station/station.py</code>): true position and heading, the track<br>and the seven readings draw the race from above, beside the OLED drawn<br>large; the keyboard is the app board (arrows, <code>a</code>, <code>b</code>, <code>s</code>, <code>1</code>-<code>5</code>,<br><code>-</code>/<code>+</code>), and <code>quiet</code> / <code>loud</code> stop and restart <code>$LINE</code>. Appended at the<br>end, so field 3 is still field 3. <strong>Not yet watched in Wokwi.</strong></p>
 </section>
 <section class="slide">
 <h2>Slide 26: What Each Choice Costs</h2>
@@ -776,7 +778,7 @@ python host\leaderboard.py captures\*.txt</code></pre>
 <section class="slide">
 <h2>Slide 27: What Was Measured — and What Could Not Be</h2>
 <p><strong>Measured on the host</strong> (<code>host/run.bat</code>, exit code 0, all checks pass):<br>every track closes; default gains finish five laps of all four; the speed<br>sweep, P vs PD vs PID, noise vs filter, dead sensors, ambient light; two<br>identical runs give identical results; the OLED frame drawn by the real<br><code>view.c</code>.</p>
-<p><strong>Built for the chip</strong>: zero warnings, FLASH 26 988 B, RAM 9 352 B.</p>
+<p><strong>Built for the chip</strong>: zero warnings, FLASH 29 484 B, RAM 9 744 B.</p>
 <p><strong>Not yet watched running in Wokwi.</strong> What that leaves open:</p>
 <ul><li><strong>Timing.</strong> Does the world step fit its 5 ms on a 48 MHz M0+ with soft float? <code>stats</code> will say. If it does not, every lap time on the chip will differ from the host&#x27;s, because world time is counted in steps.</li><li><strong>The display&#x27;s bus share.</strong> ~500 bytes a frame (measured on the host) at a polled 400 kHz is ~12 ms of CPU every 100 ms, at priority 1 — the bytes are counted, the milliseconds are estimated.</li><li><strong>Stacks.</strong> Sized by analysis; <code>stats</code> prints the real high-water marks.</li></ul>
 </section>

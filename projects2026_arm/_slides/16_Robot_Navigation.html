@@ -673,10 +673,10 @@ static uint16_t heap[ASTAR_HEAP];   /* the open list, 160 slots          320 B *
 </section>
 <section class="slide">
 <h2>Slide 21: The Python Tier — <code>host/planner.py</code></h2>
-<pre><code>python host/planner.py --level 3                 the level, and the A* path on it
-python host/planner.py --map mine.txt --frames   frames to paste into the serial monitor
-python host/planner.py --file capture.txt        read telemetry + check the board&#x27;s plan
-python host/planner.py --compare paths.txt       check every level against astar.c</code></pre>
+<pre><code>uv run host/planner.py --level 3                 the level, and the A* path on it
+uv run host/planner.py --map mine.txt --frames   frames to paste into the serial monitor
+uv run host/planner.py --file capture.txt        read telemetry + check the board&#x27;s plan
+uv run host/planner.py --compare paths.txt       check every level against astar.c</code></pre>
 <p>Same costs, same neighbour order, same <code>(f, h, cell)</code> tie-break — so it finds<br>the <strong>same path, cell for cell</strong>, not merely the same cost. It reads the<br>levels from <code>levels.c</code> itself, so the two cannot drift apart.</p>
 <ul><li>On the host: <strong>15 of 15</strong> level × inflation combinations identical — path, cost <em>and</em> nodes expanded.</li><li>Against the <strong>Renode</strong> firmware: on every level the shell&#x27;s <code>dump</code> sent the robot&#x27;s half-built map and its plan 8 s in; <code>planner.py --file</code> re-planned that map — unknown cells and all — in Python. <strong>5 of 5 the same path, cell for cell</strong> (level 1: cost 187, 74 nodes, 16 cells).</li></ul>
 <p>Frames to the robot use lesson 08&#x27;s checksums: <code>$GOAL,x,y</code>, <code>$START,x,y</code>,<br><code>$MAP,y,hexbits</code> (bit 31 = x 0), <code>$LEVEL,6</code> for the custom map. The browser<br>route is copy and paste; <code>--port</code> sends them live.</p>
@@ -794,7 +794,7 @@ python host/planner.py --compare paths.txt       check every level against astar
 </section>
 <section class="slide">
 <h2>Slide 23: Fitting in 32 KB and 12 KB</h2>
-<p>First build: <strong>34 932 B of flash and 15 136 B of RAM</strong> (counting the linker&#x27;s<br>1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now <strong>29 216 B<br>and 11 328 B</strong>. What got it there, each measured build to build:</p>
+<p>First build: <strong>34 932 B of flash and 15 136 B of RAM</strong> (counting the linker&#x27;s<br>1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now <strong>29 216 B<br>and 11 328 B</strong> — <strong>31 100 B and 11 584 B</strong> with the PC station&#x27;s keys and OLED<br>mirror (<code>LIBS += keys kbd mirror</code>; run <code>uv run tools/station/station.py</code>, not<br>yet watched in Wokwi). What got it there, each measured build to build:</p>
 <table><thead><tr><th>Change</th><th>Saved</th></tr></thead><tbody><tr><td><code>strtok()</code> → a 12-line <code>split()</code>: newlib&#x27;s strtok mallocs, asserts, and assert prints</td><td>3036 B flash</td></tr><tr><td><code>vprintf</code> → <code>vsnprintf</code> + <code>_write</code>; <code>atoi</code>/<code>strtoul</code> → 10 lines</td><td>917 B flash</td></tr><tr><td>one command dispatcher for typed words <em>and</em> <code>$frames</code></td><td>768 B flash</td></tr><tr><td>fmath&#x27;s inline <code>f_sin</code> etc. called through one out-of-line copy (<code>mathx.c</code>)</td><td>552 B flash</td></tr><tr><td>five task stacks of guessed size → four, sized from Renode&#x27;s high-water marks</td><td>2560 B RAM</td></tr><tr><td>A* 3136 → 2112 B (direction parents, a byte-wide <code>hpos</code>, a measured heap)</td><td>1024 B RAM</td></tr></tbody></table>
 <p>Measured stack use (Renode, after a full run and a <code>dump</code>): world 52 of 96<br>words, robot 174 of 224, ui 216 of 272, shell 254 of 304.</p>
 </section>

@@ -3,4 +3,7 @@
 version = 1
 firmware = 'Main.hex'
 elf = 'Main.elf'
+# Serial port forwarding: the simulated USART2 becomes a TCP server that the
+# station reaches as rfc2217://localhost:4000 (tools/station/station.py).
+rfc2217ServerPort = 4000
 gdbServerPort = 3333   # F5 in VS Code attaches arm-none-eabi-gdb here; see .vscode/launch.json

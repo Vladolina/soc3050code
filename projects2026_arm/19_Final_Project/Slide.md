@@ -615,6 +615,8 @@ command, a fault flag.
 | the UART | everyone | `print_lock`, whole lines | lesson 08 |
 | heartbeats | each task → health | **one counter per task** | single writer: no lock at all |
 | `prof[]` timing | each task → shell | single writer + clear *request* | the shell never writes a counter |
+| the station's keys (`kbd`) | shell → input | `kbd_lock` mutex | two writers: `kbd_frame()` and `kbd_apply()` |
+| the OLED mirror's state | shell → display | `mirror_lock` mutex | `$MIRROR` and `$FB` both change it |
 
 Two rules generate the whole table: **one writer per variable**, where you
 can arrange it; and **the cheapest lock that is long enough** where you
@@ -782,14 +784,15 @@ From this lesson's build — `arm-none-eabi-size -A Main.elf` and `nm --size-sor
 
 | Item | Bytes | |
 |---|---|---|
-| **FLASH total** | **16 648** | of 32 768 (50.8 %) |
-| **RAM total** | **10 280** | of 12 288 (83.7 %) |
+| **FLASH total** | **18 780** | of 32 768 (57.3 %) |
+| **RAM total** | **10 552** | of 12 288 (85.9 %) |
 | six task stacks | 6 016 | 160 + 256 + 288 + 224 + 256 + 320 words |
 | idle stack | 256 | the kernel's |
 | OLED framebuffer | 1 032 | 8 × (1 + 128) |
 | UART rings | 320 | TX 256 + RX 64 |
 | newlib stdio | 388 | `__sf` + `_impure_data` |
 | heap + main stack | 1 536 | `link.ld`'s minimum reservation |
+| the station | 264 | `kbd` 76, mirror state 83, `$FB` buffer 96, locks 9 |
 
 **Stacks are the line you will get wrong.** These sizes come from
 `-fstack-usage` plus newlib's printf frames read off the disassembly:
@@ -799,7 +802,7 @@ alone.** A static estimate, not a measurement — `stats` prints the real
 high-water mark (lesson 07's `os_stack_used()`). Requirement: every stack
 ≤ 75 % used after the full demo.
 
-2 KB of RAM is left. A second 1 KB framebuffer would not fit; a 64-entry
+1.7 KB of RAM is left. A second 1 KB framebuffer would not fit; a 64-entry
 replay log would.
 
 ---
@@ -961,7 +964,7 @@ year's project, with or without AI in between.
 
 | Claim | Evidence |
 |---|---|
-| builds with zero warnings, 16 648 B flash, 10 280 B RAM | this lesson's build |
+| builds with zero warnings, 18 780 B flash, 10 552 B RAM | this lesson's build |
 | app logic: speeds, friction stop, fuzz, determinism, bot score | **measured on the host** — slide 21 |
 | health logic: missing bitmap, starve and force times | **measured on the host** — `[8]` |
 | frame cost 1088 B | **measured on the host** — byte count through the real `oled.c` |
@@ -969,6 +972,7 @@ year's project, with or without AI in between.
 | CPU %, response times, idle | **not measured** — needs the target: `stats` |
 | IWDG register sequence | ST's HAL source and header; **not run anywhere** |
 | IWDG reset on silicon | **not observable in Wokwi** (not implemented there) |
+| the station: keys in as `$KEY`, the OLED out as `$FB`, the view | view fed frames on the PC; **not yet watched in Wokwi** |
 
 **Not yet watched running in Wokwi.** The first three things to look at:
 the boot banner (does the OLED answer, what reset cause does Wokwi report),

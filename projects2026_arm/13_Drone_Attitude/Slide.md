@@ -864,8 +864,8 @@ quad it is the hot-motor whine every pilot learns to hear.
 | world | 500 Hz | 5 (most urgent) | `world_step` + `world_sense` → `g_sens` |
 | ctrl | 250 Hz | 4 | `g_sens` → `control_step` → `g_act` |
 | pilot | 50 Hz | 3 | joystick, buttons, knob, throttle ramp, `$ATT` at 25 Hz, beeps |
-| shell | on input | 2 | `stats`, `alpha`, `aw`, `mix`, `kick`, `hold` |
-| disp | 15 Hz | 1 | horizon, motor bars, flush to the OLED |
+| shell | on input | 2 | `stats`, `alpha`, `aw`, `mix`, `kick`, `hold`, `quiet`, `loud`; the station's `$KEY` / `$MIRROR` |
+| disp | 15 Hz | 1 | horizon, motor bars, flush to the OLED, then up to 2 `$FB` mirror frames |
 
 The physics is the most urgent task because physics waits for nobody. The
 structs cross between tasks inside two-line critical sections (lesson 03's
@@ -998,12 +998,17 @@ Angles in tenths of a degree, motors in thousandths — integers, because
 `$EST,<ms>,<roll>,<pitch>,<accel-only roll>,<accel-only pitch>`.
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
+uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
 ```
 
 charts the estimated roll (field 2) from a capture; field 6 is the truth.
 Chart both in turn and you have slide 11's error, from the simulator, by
 hand.
+
+Live instead: `uv run tools/station/station.py` draws the same frames as a
+window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and
+sends keys for every control; `quiet` / `loud` stop and restart `$ATT`. Not
+yet watched in Wokwi.
 
 ---
 

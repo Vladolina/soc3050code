@@ -248,7 +248,7 @@ def open_port(url):
     try:
         import serial
     except ImportError:
-        sys.exit("pyserial is needed for --port:  pip install pyserial")
+        sys.exit("pyserial is needed for --port:  uv sync  at the repository root")
     return serial.serial_for_url(url, baudrate=115200, timeout=0.2)
 
 

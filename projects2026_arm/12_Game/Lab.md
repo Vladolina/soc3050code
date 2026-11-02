@@ -86,6 +86,39 @@ diagram has focus"). Turn the **knob**: the five SPEED boxes follow it. Press
 > has keyboard focus. If it does not, click the button with the mouse — and
 > note it down; it decides how playable FLAP is.
 
+**Or play from the serial terminal** — the easier way once the OLED is zoomed
+to fill the window. Click into the Wokwi serial terminal in VS Code and use:
+
+| Key | Does |
+|---|---|
+| arrows | the stick |
+| `a` | button A — play, serve, flap |
+| `b` or `p` | button B — pause, back |
+| `s` | stick press — `DIRTY` / `FULL` |
+| `1` … `5` | the knob, as a SPEED level |
+| `?` | print this list |
+| `-` / `+` | slow motion: the pace, 20 / 30 / 40 / 60 / 80 / 100 % — **30 % at boot** |
+| `quiet` + Enter | stop the `$PERF` line — `loud` + Enter brings it back |
+
+The keys go into the same `pad_t` the pins fill (`_lib/kbd.c`), so no game can
+tell. One difference you will feel: a terminal sends a key when it is
+pressed, never when it is released, so an arrow holds the stick for 150 ms
+and your PC's auto-repeat keeps it held. Hold Right in BREAKOUT and watch the
+paddle pause once before auto-repeat starts.
+
+**Best: play from the station.** With the simulation running, start
+
+```
+uv run tools\station\station.py
+```
+
+from the repository root. The OLED appears five times larger, `$PERF` is
+charted beside it, and the same keys work once you click the picture — but
+now the station sends each key's release too, so holding Right holds the
+paddle with no pause. Type shell words (`quiet`, `loud`) into its command
+line. Not yet tried against Wokwi: if the station keeps saying *waiting for
+rfc2217://localhost:4000*, write that down and use the terminal keys.
+
 ---
 
 ## Part 1 — Play, and beat the machine (15 min)
@@ -112,7 +145,7 @@ The host test's autopilots set the bar, at level 3:
 > SNAKE, probably: its autopilot is greedy and boxes itself in. BREAKOUT's
 > autopilot knows the ball's velocity exactly and never misses, so only its
 > *score rate* is beatable — by aiming at the top rows, which pay 4× level per
-> brick. FLAP's 97 is beatable by patient humans, and less so at higher speeds
+> brick. FLAP's 75 is beatable by patient humans, and less so at higher speeds
 > (Part 6).
 >
 > Every finished game printed a line like `$SCORE,SNAKE,42*1C`. Keep the best
@@ -121,6 +154,10 @@ The host test's autopilots set the bar, at level 3:
 ---
 
 ## Part 2 — What do dirty pages buy? (20 min)
+
+**First press `+` four times** (terminal or station), until the board says
+`pace 100 %`: the numbers below are for full speed, and at the boot pace of
+30 % `fps` and `ups` read about 15 instead of 50.
 
 **Do this:** play SNAKE for 10 seconds and copy three `$PERF` lines. Press the
 joystick (SEL) once — the last field changes from `DIRTY` to `FULL` — and copy
@@ -138,9 +175,9 @@ $PERF,<fps>,<ups>,<flush_us>,<max_us>,<bytes/frame>,<busy %>,<mode>*CS
 >
 > | | fps | ups | bytes/frame | flush |
 > |---|---|---|---|---|
-> | SNAKE `DIRTY` | 50 | 50 | ~120 | ~3 ms |
+> | SNAKE `DIRTY` | 50 | 50 | ~47 | ~1 ms |
 > | SNAKE `FULL` | ~40 | 50 | 1 032 | ~25 ms |
-> | FLAP `DIRTY` | ~47 | 50 | ~870 | ~21 ms |
+> | FLAP `DIRTY` | 50 | 50 | ~625 | ~15 ms |
 >
 > **`ups` stays 50**: the snake moves at exactly the same speed. Only the
 > picture rate falls, because the fixed-step loop runs two updates before
@@ -182,7 +219,7 @@ so every frame clears the screen and redraws the wall and the whole snake.
 **Do this:** run `host\run.bat`.
 
 > The test still passes every *game* check — the game is unchanged — but the
-> bus table moves SNAKE from **129 to 970 bytes per frame** (88 % of a full
+> bus table moves SNAKE from **50 to 968 bytes per frame** (88 % of a full
 > repaint, every frame over the 20 ms tick), and the check *"dirty pages cut
 > SNAKE's bus traffic by more than 4x"* **fails** — measured on the host. Clearing changes every lit byte to 0 and redrawing changes it
 > back: two real changes per byte, so every page with anything on it is dirty
@@ -211,7 +248,7 @@ sprite.
 then
 
 ```
-python host\sprite.py apple.txt
+uv run host\sprite.py apple.txt
 ```
 
 It prints the bytes `oled_sprite()` wants — **columns, bit 0 at the top**.
@@ -234,23 +271,24 @@ screenshot in `host\out\flap.txt` shows your bird, drawn by the real code.
 
 ## Part 5 — Spend the frame budget (15 min)
 
-`TICK_MS` in `engine.h` is 20: 50 updates a second. Make it **10** (100 Hz).
+`TICK_MS` in `engine.h` is 20: 50 updates a second at pace 100 % (press `+`
+until it says so). Make it **10** (100 Hz).
 
 **Guess first:** with a full flush costing ~25 ms, what happens to `fps` and
 `ups` in `FULL` mode? And does the snake move faster?
 
 > Run the host test first. Two checks fail, and *which* two is the lesson:
 >
-> - FLAP's *"hovers 3 s then falls on tick 171"* now says **321**. The hover is
+> - FLAP's *"hovers 3 s then falls on tick 193"* now says **343**. The hover is
 >   written `3 * TICK_HZ` — three *seconds* — so it became 300 ticks. The fall
->   is in ticks, and the same 22 ticks now take half the time.
+>   is in ticks, and the same 44 ticks now take half the time.
 > - The arcade's high-score check fails because the 0.75 s hold after a game
 >   over is `TICK_HZ * 3 / 4` = 75 ticks now, and the script only waits 50.
 >
 > Everything written in ticks — SNAKE's move period, every speed, gravity —
 > now runs **twice as fast**; everything written in seconds stays put. The loop
-> table shows `ups` 100 and, in `FULL`, `fps` still ~40: nearly every frame now
-> runs 2 or 3 updates. `MAX_CATCHUP = 4` also covers only 40 ms now.
+> table shows `ups` 100 and, in `FULL`, `fps` still ~40: every frame now runs
+> 2 or 3 updates. `MAX_CATCHUP = 4` also covers only 40 ms now.
 >
 > A commercial engine would express every speed per *second* and scale by
 > `TICK_MS`; this one keeps ticks as the unit so the integer physics is exact
@@ -271,21 +309,24 @@ runs every autopilot at levels 1–5 with three seeds:
 
 ```
   level | SNAKE apples  survived | BREAKOUT bricks  survived | FLAP pipes  survived
-    1   |     67.7     111.3 s  |     117.3        300.0 s  |   135.3     104.8 s
-    2   |     67.7     100.9 s  |     154.0        300.0 s  |    92.7      73.3 s
-    3   |     67.7      92.6 s  |     129.7        300.0 s  |    63.3      48.9 s
-    4   |     67.7      85.8 s  |     154.7        300.0 s  |    15.3      13.9 s
-    5   |     67.7      81.0 s  |     230.0        299.1 s  |     3.7       4.6 s
+    1   |     56.0     265.5 s  |      86.3        300.0 s  |   121.7     194.3 s
+    2   |     61.0     235.8 s  |      85.7        300.0 s  |    65.3     108.8 s
+    3   |     67.3     212.3 s  |      84.7        300.0 s  |    43.0      71.4 s
+    4   |     67.7     188.2 s  |      89.0        300.0 s  |    31.3      51.2 s
+    5   |     67.7     169.5 s  |     106.0        300.0 s  |     1.7       6.2 s
 ```
 
-**Read it first.** FLAP falls off a **cliff** between levels 3 and 4: the gap
-shrinks 2 px per level (`gap = 28 - 2 * lvl`), and a flap climbs ~11 px, so
-below a 22 px gap there is almost no room to recover. SNAKE's apple count does
-not change with level at all — its autopilot is never in a hurry; only the
-time does.
+**Read it first.** FLAP's pipe count roughly halves from level 1 to 2, then
+falls more gently to 31 at level 4 — and then off a **cliff**: 1.7 pipes at
+level 5, 6.2 s survived. The gap shrinks 2 px per level
+(`gap = 28 - 2 * lvl`: 20 px at level 4, 18 at level 5) while a flap still
+climbs ~11 px. SNAKE's apple count hardly moves with level (56 at level 1,
+67-68 from level 3 up) — its autopilot is never in a hurry; only the
+survival time falls, from 266 s to 170 s.
 
 **Do this:** change FLAP's curve so the survival time falls *smoothly* —
-roughly halving per level, not dropping by 70 % at once. Ideas: shrink the gap
+falling step by step all the way to level 5, not dropping by 95 % at the last
+step. Ideas: shrink the gap
 by 1 px per level and raise `speed` instead; or soften `GRAVITY`. Re-run
 `--playtest` until the FLAP column looks like a curve, then run the full test
 to be sure nothing else broke.
@@ -326,14 +367,14 @@ $SCORE,FLAP,23*52
 `scores\kim.txt` (one folder for the class, one file per player), then
 
 ```
-python host\leaderboard.py scores\*.txt
+uv run host\leaderboard.py scores\*.txt
 ```
 
 **Guess first:** change one digit of your score in the file. What happens?
 
 > The line is **rejected**: the two hex digits are the XOR of every character
 > between `$` and `*` (lesson 08's `proto_checksum()`), and a changed digit
-> changes the XOR. `python host\leaderboard.py --check '$SCORE,FLAP,23*52'`
+> changes the XOR. `uv run host\leaderboard.py --check '$SCORE,FLAP,23*52'`
 > shows the checksum it expects.
 >
 > Now compute the right checksum for your edited line by hand — XOR the ASCII
@@ -342,7 +383,7 @@ python host\leaderboard.py scores\*.txt
 > class leaderboard, honesty plus a checksum is the right amount of security.
 >
 > **Challenge for the class:** highest FLAP at SPEED 5. The autopilot manages
-> 3.7 pipes there.
+> 1.7 pipes there.
 
 ---
 

@@ -20,10 +20,23 @@
  *   sound      app -> input        a one-slot mailbox; input owns TIM3
  *   app state  app, display, telem app_lock (a mutex: draw takes ~ms)
  *   I2C1       display, shell      bus_lock
- *   the UART   everyone            print_lock, whole lines (say())
+ *   the UART   everyone            print_lock, whole lines (say(), send_raw())
+ *   keys       shell -> input      kbd_lock: the station's $KEY frames (kbd.h)
+ *   mirror     shell -> display    mirror_lock: $MIRROR,1 vs building $FB
+ *   quiet      shell -> telem      one byte, one writer: the shell
  *   heartbeats each task -> health one counter per task, one writer each
  *
- * Build:     build.bat          (LIBS=retarget os uart proto i2c oled adc pad beep)
+ * THE STATION.  uv run tools/station/station.py, on the PC, is this board's
+ * screen, keyboard and dashboard in one window.  Three things connect it:
+ *   - its keys arrive as $KEY lines; the shell hands them to kbd_frame(),
+ *     and input folds them into the pad with kbd_apply() - so app.c cannot
+ *     tell the keyboard from the board;
+ *   - display copies the OLED to it as $FB frames (mirror.h), but only while
+ *     the station keeps asking with $MIRROR,1;
+ *   - its view of THIS lesson, tools/station/views/l19_final.py, draws $APP
+ *     and $SYS.  Your project's view starts as a copy of that file.
+ *
+ * Build:     build.bat          (LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror)
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf.
  * Host:      host\run.bat       (tests app.c and health.c on the PC)
  */
@@ -41,6 +54,8 @@
 #include "adc.h"
 #include "pad.h"
 #include "beep.h"
+#include "kbd.h"
+#include "mirror.h"
 #include "wdog.h"
 #include "health.h"
 #include "prof.h"
@@ -74,7 +89,7 @@ STACK(stk_input, W_INPUT);  STACK(stk_app, W_APP);        STACK(stk_tel, W_TEL);
 STACK(stk_disp, W_DISP);    STACK(stk_health, W_HEALTH);  STACK(stk_shell, W_SHELL);
 
 /* ---- shared state (declared in sys.h) ------------------------------------ */
-os_mutex_t print_lock, bus_lock, app_lock;
+os_mutex_t print_lock, bus_lock, app_lock, kbd_lock, mirror_lock;
 health_t   health;
 prof_t     prof[T_WATCHED] = {
     [T_INPUT]   = { .name = "input",   .period_ms = INPUT_MS },
@@ -85,6 +100,8 @@ prof_t     prof[T_WATCHED] = {
 volatile uint32_t fault_hang, fault_spin, i2c_errors;
 uint8_t           oled_ok;
 uint32_t          boot_flags;
+kbd_t             kbd;          /* the station's keys: shell writes, input applies */
+volatile uint8_t  tel_quiet;    /* 1 after `quiet`: no $APP / $SYS until `loud` */
 
 /* controls: written by input, consumed by app */
 static pad_t shared_pad;
@@ -110,6 +127,19 @@ void send_body(const char *body, int len)
 {
     if (len <= 0) { return; }
     say("$%s*%02X\n", body, (unsigned)proto_checksum(body, (size_t)len));
+}
+
+/* A line that is already built - the OLED mirror's $FB frames.  Same lock as
+ * say(), so it never lands inside someone else's line, but straight into the
+ * UART ring: no printf, so none of printf's ~650 bytes of stack.  The display
+ * task calls it, and stays as deep as app_draw()'s oled_printf() made it. */
+int _write(int fd, const char *buf, int len);           /* uart.c */
+
+void send_raw(const char *buf, size_t len)
+{
+    os_mutex_lock(&print_lock);
+    _write(1, buf, (int)len);
+    os_mutex_unlock(&print_lock);
 }
 
 /* ============================================================================
@@ -146,6 +176,9 @@ static void task_input(void *arg)
 
         pad_t p;
         pad_read(&p);
+        os_mutex_lock(&kbd_lock);                /* the station's keys, folded  */
+        kbd_apply(&kbd, &p, os_ticks());         /* into the same pad (kbd.h)   */
+        os_mutex_unlock(&kbd_lock);
 
         /* STICKY EDGES.  Input runs twice per app step.  If it simply
          * overwrote shared_pad, a press seen on the first run would be gone
@@ -219,6 +252,20 @@ static void task_display(void *arg)
             if (rc != 0) { i2c_errors++; }
         }
 
+        /* The station's copy of the screen: at most 2 frames a pass, and only
+         * while the UART ring has room for a whole one - so the mirror never
+         * waits for the serial port, it just falls behind.  It sends nothing
+         * unless the station asked ($MIRROR,1).  Runs even with no OLED: it
+         * copies the framebuffer in RAM, not the panel. */
+        static char frame[MIRROR_FRAME_MAX];     /* static: off the task stack  */
+        for (int i = 0; i < 2 && uart_tx_room() >= MIRROR_FRAME_MAX; i++) {
+            os_mutex_lock(&mirror_lock);         /* the shell's mirror_frame()  */
+            size_t len = mirror_next(frame, sizeof frame, os_ticks());
+            os_mutex_unlock(&mirror_lock);
+            if (len == 0) { break; }
+            send_raw(frame, len);
+        }
+
         prof_end(&prof[T_DISPLAY]);
         health_beat(&health, T_DISPLAY);
     }
@@ -251,7 +298,7 @@ static void task_tel(void *arg)
         int len = app_telemetry(body, sizeof body);
         os_mutex_unlock(&app_lock);
         if (len >= (int)sizeof body) { len = (int)sizeof body - 1; }   /* truncated */
-        send_body(body, len);
+        if (!tel_quiet) { send_body(body, len); }           /* `quiet` stops it */
 
         if (++n % 10u == 0u) {
             os_task_t *idle = idle_task();
@@ -262,7 +309,7 @@ static void task_tel(void *arg)
                            (unsigned long)now, (unsigned long)permille,
                            (unsigned long)os_switches(), (unsigned long)i2c_errors,
                            (unsigned long)oled_bytes_sent(), (unsigned long)health.feeds);
-            send_body(body, len);
+            if (!tel_quiet) { send_body(body, len); }
         }
 
         prof_end(&prof[T_TEL]);
@@ -348,7 +395,10 @@ int main(void)
     int w = wdog_start();
     printf("  watchdog : IWDG %u ms%s, fed by health every %u ms if all %u tasks beat\n",
            WDOG_TIMEOUT_MS, w == 0 ? "" : " (update flags stuck)", HEALTH_MS, (unsigned)T_WATCHED);
-    printf("  shell    : help  stats  health  scan  hang <task>  spin <task>  reset\n\n");
+    printf("  shell    : help  stats  health  scan  hang <task>  spin <task>  reset  quiet  loud\n");
+    printf("  station  : uv run tools/station/station.py - the OLED large, $APP/$SYS charts, keys\n");
+    printf("%s\n", KEYS_HELP);              /* say() needs the scheduler running */
+    kbd_init(&kbd);
     beep(660, 60, 0);
 
     os_task_create("input",   task_input,   0, stk_input,  W_INPUT,  PRIO_INPUT);

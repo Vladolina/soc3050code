@@ -10,8 +10,13 @@
  * its altitude, with a motor in place of the button.  A flap does not push:
  * it SETS the upward speed, which is why the game feels crisp.
  *
- *   gravity 28/256 px per tick^2  = 273 px/s^2   (the screen is 64 px tall)
- *   flap    -400/256 px per tick  = -78 px/s     peaks ~11 px higher, 0.29 s later
+ *   gravity 7/256 px per tick^2   =  68 px/s^2   (the screen is 64 px tall)
+ *   flap    -200/256 px per tick  = -39 px/s     peaks ~11 px higher, 0.57 s later
+ *
+ * Those are HALF the original time scale (gravity 28, flap -400, scroll
+ * 1.0 px per tick), slowed on 2026-11-03 because the game was too fast to
+ * follow in the simulator.  Halving time means velocities / 2 and
+ * accelerations / 4: every arc keeps its shape and takes twice as long.
  *
  * Three pipes scroll left and are recycled: when one leaves the screen it
  * moves to 3 x spacing to the right with a new random gap.  Pipes span the
@@ -23,9 +28,9 @@
 #define BIRD_X     20
 #define BIRD_W     8
 #define BIRD_H     6
-#define GRAVITY    28
-#define FLAP       (-400)
-#define VMAX       640                  /* terminal velocity, 2.5 px/tick    */
+#define GRAVITY    7
+#define FLAP       (-200)
+#define VMAX       320                  /* terminal velocity, 1.25 px/tick   */
 #define NPIPES     3
 #define PIPE_W     10
 #define SPACING    52                   /* pixels between pipes              */
@@ -67,7 +72,7 @@ static void flap_start(int lvl)
 {
     level = lvl;  score = 0;
     gap   = 28 - 2 * lvl;               /* 26 px at level 1 .. 18 at level 5 */
-    speed = 256 + 24 * (lvl - 1);       /* 1.0 .. 1.4 px per tick            */
+    speed = 128 + 12 * (lvl - 1);       /* 0.5 .. 0.7 px per tick            */
     by = (int32_t)32 << FP;  vy = 0;
     waiting = 1;  wait_ticks = 0;  flap_anim = 0;  stick_was_up = 0;
     for (int i = 0; i < NPIPES; i++) {
@@ -103,7 +108,7 @@ static int flap_step(const pad_t *in)
     int y = (int)(by >> FP);
     if (y + BIRD_H > OLED_H) { return 1; }                                  /* ground  */
 
-    int pace = speed + 8 * (int)(score / 5);           /* a little faster every 5 */
+    int pace = speed + 4 * (int)(score / 5);           /* a little faster every 5 */
     for (int i = 0; i < NPIPES; i++) {
         pipe_t *p = &pipes[i];
         p->x -= pace;

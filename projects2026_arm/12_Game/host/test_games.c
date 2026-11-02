@@ -27,6 +27,8 @@
 #include "arcade.h"
 #include "i2c.h"
 #include "proto.h"
+#include "kbd.h"
+#include "mirror.h"
 
 /* ============================================================================
  *  The stubs: an I2C bus that only counts, and the two platform hooks
@@ -128,6 +130,23 @@ static uint32_t fb_hash(void)
 typedef pad_t (*pilot_fn)(int t);
 
 static pad_t no_input(int t) { (void)t; pad_t p; memset(&p, 0, sizeof p); p.knob = 500; return p; }
+
+/* Bytes into kbd.c as a terminal would send them; the last command wins. */
+static int kbd_type(kbd_t *k, const char *s, uint32_t now)
+{
+    int cmd = KBD_NONE;
+    for (; *s; s++) { int c = kbd_feed(k, (uint8_t)*s, now); if (c != KBD_NONE) { cmd = c; } }
+    return cmd;
+}
+
+/* One $KEY frame from the station, checksum and all. */
+static int kbd_key(kbd_t *k, const char *key, int down, uint32_t now)
+{
+    char body[16], line[24];
+    int n = snprintf(body, sizeof body, "KEY,%s,%d", key, down);
+    snprintf(line, sizeof line, "$%s*%02X", body, (unsigned)proto_checksum(body, (size_t)n));
+    return kbd_frame(k, line, now);
+}
 
 /* SNAKE: of the moves that do not die at once, prefer those that leave room
  * to live (a flood fill counts the reachable cells), then the shortest way to
@@ -496,8 +515,8 @@ int main(int argc, char **argv)
     CHECK(s.score == 3 * eats, "score = level x apples: %ld = 3 x %ld", (long)s.score, eats);
     run_t s0 = run(&game_snake, 3, 12345u, no_input, 2000, 0, 0, 0);
     /* head starts at cell 10 of 31 heading right: 20 moves to the last
-     * column, the 21st hits the wall; level 3 moves every 6 ticks. */
-    CHECK(s0.over && s0.ticks == 21 * 6, "no input: hits the wall on tick %d (predicted 21 x 6 = 126)", s0.ticks);
+     * column, the 21st hits the wall; level 3 moves every 12 ticks. */
+    CHECK(s0.over && s0.ticks == 21 * 12, "no input: hits the wall on tick %d (predicted 21 x 12 = 252)", s0.ticks);
     run_t sd = run(&game_snake, 3, 12345u, snake_pilot, 20000, 1, 0, 0);
     run_t sa = run(&game_snake, 3, 12345u, snake_pilot, 20000, 0, 0, 0);
     CHECK(sa.hash == s.hash && sa.score == s.score && sa.ticks == s.ticks,
@@ -531,9 +550,9 @@ int main(int argc, char **argv)
     CHECK(f.score >= 25, "bird passes pipes: %ld (need >= 25)", (long)f.score);
     run_t f0 = run(&game_flap, 3, 99u, no_input, 2000, 0, 0, 0);
     /* Hovers until tick 150, which is also the first tick of falling from
-     * y = 32.  After n ticks it has fallen 28 x n(n+1)/2 / 256 px, and it is
-     * down when y + 6 > 64, i.e. 27 px: n(n+1) >= 494 -> n = 22, tick 171. */
-    CHECK(f0.over && f0.ticks == 171, "no input: hovers 3 s then falls to the ground on tick %d (predicted 149 + 22 = 171)", f0.ticks);
+     * y = 32.  After n ticks it has fallen 7 x n(n+1)/2 / 256 px, and it is
+     * down when y + 6 > 64, i.e. 27 px: n(n+1) >= 1975 -> n = 44, tick 193. */
+    CHECK(f0.over && f0.ticks == 193, "no input: hovers 3 s then falls to the ground on tick %d (predicted 149 + 44 = 193)", f0.ticks);
     run_t fd = run(&game_flap, 3, 99u, flap_pilot, 6000, 1, 0, 0);
     run_t ddf = run(&game_doom, 3, 2024u, doom_pilot, 6000, 1, 0, 0);
     run_t pdf = run(&game_prince, 3, 99u, prince_pilot, 6000, 1, 0, 0);
@@ -720,6 +739,129 @@ int main(int argc, char **argv)
     }
 
     printf("\nscreenshots written to host/out/: snake breakout flap doom prince menu gameover (.txt and .svg)\n");
+    /* ---- the keyboard: kbd.c turns terminal bytes into the same pad --------- */
+    printf("\nKEYBOARD (kbd.c, the terminal's keys as a pad)\n");
+    kbd_t kb;
+    kbd_init(&kb);
+    pad_t kp;
+    uint32_t now = 1000;
+    kbd_type(&kb, "\x1b[A", now);                         /* Up, as a terminal sends it */
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 20);
+    int up_now = kp.y;
+    kp = no_input(0); kbd_apply(&kb, &kp, now + KBD_HOLD_MS + 1);
+    CHECK(up_now == 100 && kp.y == 0, "ESC [ A pushes the stick up (y %d), and lets go after %u ms (y %d)",
+          up_now, (unsigned)KBD_HOLD_MS, kp.y);
+    int held = 1;                                         /* auto-repeat: every 33 ms */
+    for (uint32_t ms = 0; ms < 600; ms += 20) {
+        if (ms % 33u < 20u) { kbd_type(&kb, "\x1b[C", now + ms); }
+        kp = no_input(0); kbd_apply(&kb, &kp, now + ms);
+        if (kp.x != 100) { held = 0; }
+    }
+    CHECK(held, "a held Right, auto-repeating at 30 Hz, holds the stick right for 600 ms");
+    kbd_type(&kb, "\x1b[D", now + 700); kbd_type(&kb, "\x1b[C", now + 701);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 702);
+    CHECK(kp.x == 100, "Left then Right: the last arrow wins at once (x %d)", kp.x);
+    kbd_type(&kb, "a", now + 800);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 800);
+    int first_a = kp.pressed;
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 820);
+    CHECK(first_a == PAD_A && kp.pressed == 0, "a is ONE press of A, not a held button");
+    kbd_type(&kb, "P", now + 900);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 900);
+    CHECK(kp.pressed == PAD_B, "p (either case) is B - pause");
+    int got_q = kbd_type(&kb, "quiet\r\n", now + 1000);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 1000);
+    CHECK(got_q == KBD_QUIET && kp.pressed == 0, "typing quiet + Enter is KBD_QUIET and presses no button");
+    CHECK(kbd_type(&kb, "loud\r", now + 1100) == KBD_LOUD, "loud + Enter is KBD_LOUD");
+    CHECK(kbd_type(&kb, "-", now + 1150) == KBD_SLOWER && kbd_type(&kb, "+", now + 1160) == KBD_FASTER
+          && kbd_type(&kb, "=", now + 1170) == KBD_FASTER, "- is slower; + and = (unshifted +) are faster");
+    CHECK(kbd_type(&kb, "lod\x7fud\r", now + 1200) == KBD_LOUD, "Backspace edits the word: lod<BS>ud = loud");
+    int unk = kbd_type(&kb, "xyz\r", now + 1300);
+    CHECK(unk == KBD_UNKNOWN && strcmp(kbd_word(&kb), "xyz") == 0, "an unknown word is reported by name: '%s'", kbd_word(&kb));
+    kbd_type(&kb, "4", now + 1400);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 1400);
+    int k4 = kp.knob;
+    kp = no_input(0); kp.knob = 900; kbd_apply(&kb, &kp, now + 1420);
+    CHECK(k4 == 700 && kp.knob == 900, "4 sets the knob to 700 (level 4) until the real knob turns (now %d)", kp.knob);
+
+    /* The station's $KEY frames: real key-down and key-up. */
+    kbd_init(&kb);
+    now = 3000;
+    kbd_key(&kb, "LEFT", 1, now);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 500);
+    int left_held = kp.x;
+    kbd_key(&kb, "LEFT", 0, now + 510);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 511);
+    CHECK(left_held == -100 && kp.x == 0, "$KEY,LEFT,1 holds the stick left for 500 ms (x %d); $KEY,LEFT,0 lets go at once (x %d)",
+          left_held, kp.x);
+    kbd_key(&kb, "UP", 1, now + 600);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 600 + KBD_LIVE_MS + 1);
+    CHECK(kp.y == 0, "a station key never renewed lets go after %u ms (lost key-up)", (unsigned)KBD_LIVE_MS);
+    kbd_key(&kb, "a", 1, now + 2000);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2000);
+    int a_press = kp.pressed, a_down1 = kp.down;
+    kbd_key(&kb, "a", 1, now + 2200);                     /* the station's 200 ms repeat */
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2220);
+    int a_press2 = kp.pressed, a_down2 = kp.down;
+    kbd_key(&kb, "a", 0, now + 2300);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2320);
+    CHECK(a_press == PAD_A && a_down1 == PAD_A && a_press2 == 0 && a_down2 == PAD_A && kp.down == 0,
+          "$KEY,a: one press, held down through a repeat, up on $KEY,a,0");
+    char bad_key[] = "$KEY,UP,1*00";
+    CHECK(kbd_frame(&kb, bad_key, now + 2400) == KBD_NONE && kb.dy == 0, "a $KEY with a wrong checksum is ignored");
+    CHECK(kbd_key(&kb, "-", 1, now + 2500) == KBD_SLOWER && kbd_key(&kb, "-", 0, now + 2510) == KBD_NONE,
+          "$KEY,-,1 is KBD_SLOWER; its key-up does nothing");
+    char line[24];
+    snprintf(line, sizeof line, "$KEY,RIGHT,1*%02X\r", (unsigned)proto_checksum("KEY,RIGHT,1", 11));
+    kbd_type(&kb, line, now + 2600);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2700);
+    CHECK(kp.x == 100 && kb.wlen == 0, "a $KEY line arriving byte by byte through kbd_feed() works too (x %d)", kp.x);
+
+    /* ---- the OLED mirror: the screen to the station, in 32-byte segments --- */
+    printf("\nMIRROR (mirror.c, the OLED for the station)\n");
+    reset_panel();
+    oled_clear();
+    char fr[MIRROR_FRAME_MAX];
+    now = 20000;
+    CHECK(mirror_next(fr, sizeof fr, now) == 0, "silent until the station asks: no $FB to a plain terminal");
+    char req[24];
+    snprintf(req, sizeof req, "$MIRROR,1*%02X", (unsigned)proto_checksum("MIRROR,1", 8));
+    int took = mirror_frame(req, now);
+    int frames_all = 0, longest = 0, all_ok = 1;
+    size_t n;
+    while ((n = mirror_next(fr, sizeof fr, now)) != 0 && frames_all < 100) {
+        frames_all++;
+        if ((int)n > longest) { longest = (int)n; }
+        fr[n - 1] = 0;                                    /* drop the newline */
+        const char *b; size_t bl;
+        if (proto_check(fr, &b, &bl) != PROTO_OK || strncmp(b, "FB,", 3) != 0) { all_ok = 0; }
+    }
+    CHECK(took && frames_all == 32 && all_ok, "$MIRROR,1 -> the whole screen once: %d frames (8 pages x 4), all pass the checksum", frames_all);
+    CHECK(longest <= (int)MIRROR_FRAME_MAX - 1, "longest $FB frame %d B, under MIRROR_FRAME_MAX %u", longest, (unsigned)MIRROR_FRAME_MAX);
+    CHECK(mirror_next(fr, sizeof fr, now + 1) == 0, "then nothing, until something changes");
+    oled_pixel(70, 20, OLED_ON);                          /* page 2, columns 64..95 */
+    n = mirror_next(fr, sizeof fr, now + 2);
+    fr[n ? n - 1 : 0] = 0;
+    CHECK(n && strncmp(fr, "$FB,2,64,", 9) == 0 && mirror_next(fr, sizeof fr, now + 3) == 0,
+          "one pixel at (70, 20) sends one segment: %.9s...", n ? fr : "(none)");
+    n = mirror_next(fr, sizeof fr, now + MIRROR_REFRESH_MS + 10);
+    CHECK(n != 0, "with nothing changed, one segment is re-sent every %u ms anyway", (unsigned)MIRROR_REFRESH_MS);
+    CHECK(mirror_next(fr, sizeof fr, now + MIRROR_LIVE_MS + 10) == 0, "no $MIRROR,1 for %u ms: it stops", (unsigned)MIRROR_LIVE_MS);
+    printf("        bandwidth: a whole screen is 32 x %d B = %d B = %.0f ms at 115200 baud; one segment %.1f ms\n",
+           longest, 32 * longest, 32.0 * longest * 10.0 / 115.2, longest * 10.0 / 115.2);
+
+    reset_panel();                                        /* the arcade, played by keys */
+    arcade_init();
+    kbd_init(&kb);
+    now = 5000;
+    for (int i = 0; i < 10; i++) { kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp); now += TICK_MS; }
+    kbd_type(&kb, "\x1b[A", now);                         /* one tap: wraps to FLAP */
+    for (int i = 0; i < 20; i++) { kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp); now += TICK_MS; }
+    kbd_type(&kb, "a", now);
+    kp = no_input(0); kbd_apply(&kb, &kp, now); arcade_step(&kp);
+    CHECK(arcade_game() == 2 && arcade_state() == ARC_PLAY, "the arcade by keys: one Up tap selects FLAP, a starts it");
+
+    printf("\nscreenshots written to host/out/: snake breakout flap menu gameover (.txt and .svg)\n");
     printf("%s: %d check(s) failed\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
 }

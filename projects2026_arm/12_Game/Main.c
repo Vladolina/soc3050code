@@ -12,7 +12,8 @@
  *
  *   time     SysTick at 1 kHz, and a microsecond stopwatch read from it
  *   the loop "update at a fixed rate, render when time allows"
- *   output   sound effects on the buzzer, $SCORE and $PERF frames on serial
+ *   output   sound effects on the buzzer, $SCORE and $PERF frames on serial,
+ *            and the screen itself for the station on the PC (mirror.h)
  *
  * One loop, no RTOS - slide 18 says why.  So this lesson defines its own
  * SysTick_Handler, and does not link `os`, which would want SysTick too.
@@ -22,7 +23,16 @@
  *           toggles "dirty pages" vs "repaint everything" so you can measure
  *           what dirty pages save (Lab Part 2).
  *
- * Build:     build.bat
+ * The same controls from the serial terminal (kbd.h): arrows = stick,
+ * a = A,  b or p = B,  s = SEL,  1-5 = knob,  ? = list them,  and the words
+ * "quiet" / "loud" + Enter stop and restart $PERF.  So the OLED can be zoomed
+ * to fill the window and the game played without seeing the board.
+ *
+ * Better still, the station: uv run tools/station/station.py draws the OLED
+ * large on the PC (this file sends it as $FB frames when asked) and sends
+ * real key-down and key-up ($KEY frames), so a held key is simply held.
+ *
+ * Build:    build.bat
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf.
  */
 #include <stdarg.h>
@@ -36,9 +46,25 @@
 #include "proto.h"
 #include "engine.h"
 #include "arcade.h"
+#include "kbd.h"
+#include "mirror.h"
 
 #define BAUD         115200u
-#define MAX_CATCHUP  4               /* at most 4 updates (80 ms) per frame */
+#define MAX_CATCHUP  4               /* at most 4 updates per frame         */
+
+/* Slow motion.  One update is always TICK_MS = 20 ms of GAME time - every
+ * speed in snake.c, breakout.c and flappy.c is per tick.  How much REAL time
+ * it gets is the platform's choice: run an update every 66 ms instead of 20
+ * and the whole arcade plays at 30 %, physics and all, with no game file
+ * changed.  The - and + keys step through these; PACE_START is the default:
+ * 30 %, because at full speed the ball, the snake and the bird were too fast
+ * to follow in the simulator. */
+static const uint8_t pace_pct[] = {100, 80, 60, 40, 30, 20};   /* % of real time */
+#define PACE_COUNT  6
+#define PACE_START  4                                          /* 30 %           */
+
+/* Real ms per tick: 20, 25, 33, 50, 66, 100 at TICK_MS 20 (Lab Part 5 changes it). */
+static uint32_t pace_ms(int pace) { return TICK_MS * 100u / pace_pct[pace]; }
 
 /* SLEEP_WFI 1: the idle loop sleeps in WFI until SysTick wakes it - what
  * silicon should do.  0: it spins until the tick instead.  Wokwi needs 0:
@@ -147,11 +173,129 @@ static void send_frame(const char *fmt, ...)
 }
 
 /* ============================================================================
+ *  Serial, both ways by interrupt: keys in, text and the OLED mirror out
+ * ============================================================================
+ * IN.  The UART holds ONE received byte.  An arrow is three (ESC [ A) arriving
+ * 87 us apart, and the loop looks once a millisecond - polling would keep the
+ * last byte and lose the ESC.  So the RXNE interrupt moves each byte into a
+ * ring at once, and the loop drains the ring at its leisure (lesson 08).
+ *
+ * OUT.  retarget.c's printf waits for every byte, 87 us each: a $PERF line
+ * stalled the loop ~4 ms, and the OLED mirror (mirror.h) - 78 bytes a frame,
+ * several a second - would stall it far more.  So this lesson replaces
+ * retarget's weak _write() with a ring that the TXE interrupt drains, as
+ * lesson 08 does.  printf now returns at once; only a FULL ring makes it wait,
+ * and the mirror never fills it: it sends only when tx_room() says there is
+ * space. */
+#define RX_SIZE 32u                          /* powers of two: index & (size-1)  */
+#define TX_SIZE 512u
+
+static volatile uint8_t  rx_buf[RX_SIZE];
+static volatile uint32_t rx_head, rx_tail;   /* ISR writes head, loop writes tail */
+static volatile uint8_t  tx_buf[TX_SIZE];
+static volatile uint32_t tx_head, tx_tail;   /* loop writes head, ISR writes tail */
+
+void USART2_IRQHandler(void)
+{
+    uint32_t isr = USART2->ISR;
+    if (isr & USART_ISR_ORE) { USART2->ICR = USART_ICR_ORECF; }  /* else RX stalls */
+    if (isr & USART_ISR_RXNE_RXFNE) {
+        uint8_t c = (uint8_t)USART2->RDR;                /* reading RDR clears RXNE */
+        if (rx_head - rx_tail < RX_SIZE) { rx_buf[rx_head & (RX_SIZE - 1u)] = c; rx_head++; }
+    }
+    if ((USART2->CR1 & USART_CR1_TXEIE_TXFNFIE) && (isr & USART_ISR_TXE_TXFNF)) {
+        if (tx_tail != tx_head) { USART2->TDR = tx_buf[tx_tail & (TX_SIZE - 1u)]; tx_tail++; }
+        else { USART2->CR1 &= ~USART_CR1_TXEIE_TXFNFIE; }   /* idle: else TXE fires forever */
+    }
+}
+
+static uint32_t tx_room(void) { return TX_SIZE - (tx_head - tx_tail); }
+
+static void tx_put(uint8_t c)
+{
+    while (tx_room() == 0u) { }                  /* full: the interrupt drains it */
+    tx_buf[tx_head & (TX_SIZE - 1u)] = c;        /* the byte first, then the index */
+    tx_head++;
+}
+
+int _write(int fd, const char *buf, int len)     /* replaces retarget.c's, at link time */
+{
+    (void)fd;
+    for (int i = 0; i < len; i++) {
+        if (buf[i] == '\n') { tx_put('\r'); }
+        tx_put((uint8_t)buf[i]);
+    }
+    __disable_irq();                             /* the ISR also writes CR1 */
+    USART2->CR1 |= USART_CR1_TXEIE_TXFNFIE;
+    __enable_irq();
+    return len;
+}
+
+/* Right after uart2_init(), before the first printf: from here on _write()
+ * relies on the interrupt to empty its ring. */
+static void serial_init(void)
+{
+    USART2->CR1 |= USART_CR1_RXNEIE_RXFNEIE;    /* retarget.c turned RE on already */
+    NVIC_SetPriority(USART2_IRQn, 1);
+    NVIC_EnableIRQ(USART2_IRQn);
+}
+
+/* The OLED mirror: up to 2 $FB frames a call, only while they fit, so the
+ * loop is never held up.  Called after each flush AND over and over while the
+ * loop waits for its next tick - that idle time is what keeps the station's
+ * copy current.  At 2 frames per flush alone, a game at 30 % pace (15 frames
+ * a second) sent 30 of the screen's 32 segments a second, and FLAP's picture
+ * on the PC trailed the real one by up to a second.  The link carries ~150
+ * segments a second; the idle loop uses it.  The station asks for frames; a
+ * terminal never sees one. */
+static void mirror_poll(void)
+{
+    char frame[MIRROR_FRAME_MAX];
+    for (int i = 0; i < 2 && tx_room() >= MIRROR_FRAME_MAX; i++) {
+        size_t n = mirror_next(frame, sizeof frame, ms);
+        if (n == 0) { break; }
+        _write(1, frame, (int)n);
+    }
+}
+
+static void print_keys(void)
+{
+    printf("  keys     : arrows = stick, a = A, b/p = B, s = SEL, 1-5 = knob, ? = this\n"
+           "             - / + = slow motion,  quiet / loud + Enter = stop / restart $PERF\n");
+}
+
+/* Drain the ring into the decoder; act on, and say, what a command did. */
+static void keyboard_poll(kbd_t *k, int *perf_on, int *pace)
+{
+    while (rx_tail != rx_head) {
+        uint8_t c = rx_buf[rx_tail & (RX_SIZE - 1u)];
+        rx_tail++;
+        int cmd = kbd_feed(k, c, ms);
+        switch (cmd) {
+        case KBD_QUIET:   *perf_on = 0; printf("quiet: $PERF off - type loud to resume\n"); break;
+        case KBD_LOUD:    *perf_on = 1; printf("loud: $PERF on\n");                         break;
+        case KBD_HELP:    print_keys();                                                     break;
+        case KBD_SLOWER:
+        case KBD_FASTER:
+            if (cmd == KBD_SLOWER && *pace < PACE_COUNT - 1) { (*pace)++; }
+            if (cmd == KBD_FASTER && *pace > 0)              { (*pace)--; }
+            printf("pace %u %%: one update every %u ms\n",
+                   (unsigned)pace_pct[*pace], (unsigned)pace_ms(*pace));
+            break;
+        case KBD_UNKNOWN: printf("? '%s' - words are quiet, loud; ? lists the keys\n", kbd_word(k)); break;
+        case KBD_FRAME:   mirror_frame(kbd_line(k), ms);                                    break;
+        default: break;
+        }
+    }
+}
+
+/* ============================================================================
  *  The loop
  * ============================================================================ */
 int main(void)
 {
     uart2_init(SystemCoreClock, BAUD);
+    serial_init();
     SysTick_Config(SystemCoreClock / 1000u);       /* 1 ms tick, interrupt on */
 
     printf("\n=== SOC3050 lesson 12 - Game ===\n");
@@ -166,13 +310,20 @@ int main(void)
     beep_init();
     printf("  buzzer   : PA6, TIM3_CH1\n");
     printf("  frames   : $SCORE,game,score  per game;  $PERF,fps,ups,flush_us,max_us,bytes,busy%%,mode  per second\n");
-    printf("  stick press toggles the profiler mode: dirty pages / full repaint\n\n");
+    printf("  stick press toggles the profiler mode: dirty pages / full repaint\n");
+    printf("  station  : uv run tools/station/station.py - the OLED large, keys up and down\n");
+    print_keys();
+    printf("  pace     : %u %% - one %u ms game tick every %u ms; - and + change it\n",
+           (unsigned)pace_pct[PACE_START], (unsigned)TICK_MS, (unsigned)pace_ms(PACE_START));
+    printf("\n");
 
     arcade_init();
     oled_contrast(0xCF);
 
     pad_t pad;
-    int full_repaint = 0;
+    kbd_t kbd;
+    kbd_init(&kbd);
+    int full_repaint = 0, perf_on = 1, pace = PACE_START;
     uint32_t next = ms;                /* when the next update is due       */
     uint32_t sec_start = ms;
     uint32_t frames = 0, updates = 0, busy_us = 0, flush_sum = 0, flush_max = 0;
@@ -181,27 +332,30 @@ int main(void)
     for (;;) {
         sound_poll(ms);
 
-        /* ---- UPDATE: run every tick that is due, at exactly 20 ms each ---- */
+        /* ---- UPDATE: run every tick that is due, one per pace_ms(pace) --- */
         int ran = 0;
         uint32_t t0 = now_us();
+        keyboard_poll(&kbd, &perf_on, &pace);
         while ((int32_t)(ms - next) >= 0) {
             pad_read(&pad);
+            kbd_apply(&kbd, &pad, ms);    /* the terminal's keys, into the same pad */
             if (pad.pressed & PAD_SEL) { full_repaint ^= 1; }
             arcade_step(&pad);
             updates++;
-            next += TICK_MS;
+            next += pace_ms(pace);                /* = TICK_MS of game time    */
             if (++ran == MAX_CATCHUP) {           /* hopelessly behind: give up */
-                next = ms + TICK_MS;              /* the lost time, rather than */
+                next = ms + pace_ms(pace);        /* the lost time, rather than */
                 break;                            /* spiral into catching up    */
             }
         }
-        if (ran == 0) {               /* nothing due: sleep until the next tick */
+        if (ran == 0) {               /* nothing due: idle until the next tick */
 #if SLEEP_WFI
+            mirror_poll();            /* the UART's interrupt wakes WFI too    */
             __WFI();
 #else
             uint32_t m = ms;
-            while (ms == m) { }       /* Wokwi: spin to the tick (see SLEEP_WFI) */
-#endif
+            while (ms == m) { mirror_poll(); }   /* Wokwi: spin to the tick,  */
+#endif                                          /* feeding the mirror        */
             continue;
         }
 
@@ -217,19 +371,22 @@ int main(void)
         flush_sum += t2 - t1;
         if (t2 - t1 > flush_max) { flush_max = t2 - t1; }
         busy_us += t2 - t0;
+        mirror_poll();                /* the station's copy of the screen */
 
         /* ---- once a second: the profile ---------------------------------- */
         uint32_t el = ms - sec_start;
         if (el >= 1000u) {
             uint32_t bytes = oled_bytes_sent() - bytes_at_sec;
-            send_frame("PERF,%lu,%lu,%lu,%lu,%lu,%lu,%s",
-                       (unsigned long)(frames * 1000u / el),
-                       (unsigned long)(updates * 1000u / el),
-                       (unsigned long)(flush_sum / frames),
-                       (unsigned long)flush_max,
-                       (unsigned long)(bytes / frames),
-                       (unsigned long)(busy_us / (el * 10u)),        /* percent */
-                       full_repaint ? "FULL" : "DIRTY");
+            if (perf_on) {                            /* "quiet" turns it off */
+                send_frame("PERF,%lu,%lu,%lu,%lu,%lu,%lu,%s",
+                           (unsigned long)(frames * 1000u / el),
+                           (unsigned long)(updates * 1000u / el),
+                           (unsigned long)(flush_sum / frames),
+                           (unsigned long)flush_max,
+                           (unsigned long)(bytes / frames),
+                           (unsigned long)(busy_us / (el * 10u)),        /* percent */
+                           full_repaint ? "FULL" : "DIRTY");
+            }
             sec_start = ms;
             frames = updates = busy_us = flush_sum = flush_max = 0;
             bytes_at_sec = oled_bytes_sent();
