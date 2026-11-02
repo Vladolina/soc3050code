@@ -81,6 +81,37 @@ only while the station asks for them; serial output now goes through an
 interrupt-driven ring so the mirror never stalls the game. See
 `tools/station/README.md`.
 
+## Class tasks - one change, predict, run, explain
+
+Your instructor gives you **one task number**. For that task:
+
+1. **Predict.** Before you build, write down what you expect to see - on the
+   OLED (or the station), in `$SCORE` / `$PERF`, and in the host test.
+2. **Change.** Make only the change the task asks for.
+3. **Run.** `build.bat`, restart the simulation, play it. Then `host\run.bat`:
+   does every check still pass? If one fails, is the test wrong, or the game?
+4. **Explain.** In one sentence: why did it behave that way? If your
+   prediction was wrong, say which line you misread.
+5. **Show.** `git diff` - the instructor reads your change there.
+   Afterwards `git checkout -- .` puts the lesson back.
+
+| Task | Change | Ask yourself |
+|---|---|---|
+| **T1** Wider paddle | `breakout.c`: `pw = 22 - 2 * lvl` -> `pw = 40 - 2 * lvl` | Easier at every SPEED? Look at how the bounce angle is computed from `pw` - does a wide paddle change where the ball goes? |
+| **T2** More bricks | `breakout.c`: `COLS 12` -> `14` | Where is brick 14 drawn? Can a wave ever be cleared? (Then try `13`.) |
+| **T3** More rows | `breakout.c`: `ROWS 4` -> `8` | How close do the bricks come to the paddle? What happens to the score? |
+| **T4** More lives | `breakout.c`: `lives = 3` -> `lives = 5` | The game is fine - what does the host test say, and who is right? |
+| **T5** Wider gaps | `flappy.c`: `gap = 28 - 2 * lvl` -> `gap = 36 - 2 * lvl` | Run `host\out\test_games.exe --playtest`: where is FLAP's difficulty cliff now? |
+| **T6** Moon gravity | `flappy.c`: `GRAVITY 7` -> `3` | Floatier - but how high does one flap now lift the bird? (Peak height = v^2 / 2g.) |
+| **T7** Bigger snake | `snake.c`: `CELL 4` -> `5` | Watch the right and bottom edges. Does the host test notice? What second constant should have changed? |
+| **T8** Your own sound | `Main.c`: the notes in `T_EAT[]`, `{Hz, ms}` pairs | Make eating an apple play a three-note tune. What does `{0, 0}` do? |
+| **T9** Full speed | `Main.c`: `PACE_START 4` -> `0` | What do `$PERF`'s `fps` and `ups` read now, and why did nothing in the games change? |
+| **T10** Rich bricks | `breakout.c`: `(ROWS - r) * level` -> `(ROWS - r) * level * 10` | What does `$SCORE` print at game over? Does lesson 08's checksum still accept it? |
+
+Each task was built and run on the host on 2026-11-03: every one builds with
+zero warnings. Some make a host check fail and some make the screen wrong
+while every check passes - which is which is part of the task.
+
 ## Facts checked against sources, not memory
 
 | Fact | Source |
