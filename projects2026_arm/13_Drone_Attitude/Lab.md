@@ -42,7 +42,7 @@ host\run.bat
 simulate.bat
 ```
 
-`build.bat` must end with zero warnings, **FLASH 26 292 B and RAM 10 848 B**
+`build.bat` must end with zero warnings, **FLASH 28 524 B and RAM 11 120 B**
 — most of the chip. `host\run.bat` must end `PASSED: 0 of 24 checks
 failed`. Paste `diagram.json` into Wokwi (it adds an MPU6050 to the app
 board), then upload `Main.elf`.
@@ -55,6 +55,9 @@ board), then upload `Main.elf`.
   OLED     : 0x3C ready
   MPU6050  : 0x68 awake, DLPF 44 Hz (MPU mode available)
   world    : 500 Hz quad on a gimbal; control 250 Hz
+  A arm, B gust, SEL sim/mpu, knob Kp.  Shell: stats alpha aw mix kick hold quiet loud
+  station  : python tools/station/station.py - arrows stick, a arm, b gust,
+             s SIM/MPU, 1-5 Kp, ? keys; the OLED drawn large
 ```
 
 The OLED shows a horizon (left), `SIM SAFE`, four empty motor bars, and the
@@ -239,6 +242,32 @@ control_step     : ..... cycles (max .....) = ... us of every 4000 us
 > state (slide 22). Write down what Wokwi says. Is Wokwi's cycle count a
 > model of the flash wait state? Of the M0+ timing at all? Its number is a
 > third opinion — record it.
+
+### Part 5b — The same flight from the station (optional, 10 min)
+
+`host.py` reads a capture after the fact; the station draws it live. Run the
+simulation from the **Wokwi VS Code extension** (its `wokwi.toml` forwards
+the serial port), then, from the repository root:
+
+```
+python tools/station/station.py
+```
+
+The OLED appears large on the left; the first `$ATT` picks the attitude
+view: a window-sized horizon with the estimate filled, the truth dashed and
+your setpoint dotted, the four motors, and charts of roll, pitch and
+estimate − truth. Click the picture and the keyboard is the board: arrows =
+stick, `a` = arm, `b` = gust, `s` = SIM/MPU, `1`–`5` = the knob, `?` = the
+list. Type `quiet` in the station's command line to stop `$ATT`, `loud` to
+start it again.
+
+**Guess first:** hold → (roll right) with the station's key. Which is
+closer to the setpoint line after half a second — the filled horizon or the
+dashed one?
+
+> They should all sit together within a degree (host: 0.20° RMS estimate
+> error). **Not yet watched in Wokwi** — if the station shows anything
+> else, write down what.
 
 ---
 

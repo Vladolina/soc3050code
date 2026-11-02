@@ -49,8 +49,8 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       17608 B        32 KB     53.74%
-             RAM:        4288 B        12 KB     34.90%
+           FLASH:       19272 B        32 KB     58.81%
+             RAM:        4896 B        12 KB     39.84%
 ```
 
 Paste `diagram.json` into Wokwi (**required** — the OLED, joystick, buttons,
@@ -99,6 +99,19 @@ tell. One difference you will feel: a terminal sends a key when it is
 pressed, never when it is released, so an arrow holds the stick for 150 ms
 and your PC's auto-repeat keeps it held. Hold Right in BREAKOUT and watch the
 paddle pause once before auto-repeat starts.
+
+**Best: play from the station.** With the simulation running, start
+
+```
+python tools\station\station.py
+```
+
+from the repository root. The OLED appears five times larger, `$PERF` is
+charted beside it, and the same keys work once you click the picture — but
+now the station sends each key's release too, so holding Right holds the
+paddle with no pause. Type shell words (`quiet`, `loud`) into its command
+line. Not yet tried against Wokwi: if the station keeps saying *waiting for
+rfc2217://localhost:4000*, write that down and use the terminal keys.
 
 ---
 

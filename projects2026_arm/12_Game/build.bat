@@ -7,10 +7,10 @@ REM  because they sit in this folder.  From _lib\: printf to the serial port
 REM  (retarget), the I2C master (i2c) and the SSD1306 driver on top of it
 REM  (oled), the app board's controls (pad, which needs adc), the buzzer
 REM  (beep), lesson 08's frame checksum (proto) and key decoder (keys), and
-REM  the pad from the serial terminal (kbd).
+REM  the pad from a keyboard (kbd), and the OLED copied to the station (mirror).
 REM
 REM  No `os`: this lesson is one loop and owns SysTick itself (slide 18).
 REM ============================================================================
 set TARGET=c031c6
-set LIBS=retarget i2c oled adc pad beep proto keys kbd
+set LIBS=retarget i2c oled adc pad beep proto keys kbd mirror
 call "%~dp0..\_build\build-lesson.bat"

@@ -108,6 +108,19 @@
             "problemMatcher": []
         },
         {
+            "label": "ARM: Station",
+            "detail": "The board's OLED, keyboard and telemetry on the PC (lessons 12-19); start the Wokwi simulation too",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}\\tools\\station\\station.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "AVR: Build Slides",
             "detail": "Render every AVR Slide.md into projects2026_avr/_slides",
             "type": "shell",

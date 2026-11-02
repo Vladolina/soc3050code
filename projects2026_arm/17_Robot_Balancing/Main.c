@@ -16,6 +16,7 @@
  *   display  (view.c)     10 Hz   the robot from the side on the OLED, and a
  *                                 tilt strip chart
  *   shell                         stats  mode  noise  alpha  vbat  push  k
+ *                                 quiet  loud, and the station's $KEY/$MIRROR
  *
  * The app board:
  *   joystick up/down   drive forward / back (a speed command, up to 0.4 m/s)
@@ -31,6 +32,8 @@
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf
  * Host:      host\run.bat - lqr.py, then the SAME world.c and control.c on the PC
  * Chart:     python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
+ * Station:   python tools/station/station.py - the robot large, the OLED, keys
+ *            held for as long as they are held (kbd.h, mirror.h)
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -44,6 +47,8 @@
 #include "oled.h"
 #include "pad.h"
 #include "beep.h"
+#include "kbd.h"
+#include "mirror.h"
 #include "params.h"
 #include "world.h"
 #include "control.h"
@@ -96,6 +101,12 @@ static volatile uint16_t us_world, us_world_max, us_ctrl, us_ctrl_max, us_disp, 
 static volatile uint32_t ctrl_steps;
 
 static os_mutex_t print_lock;
+
+/* The station's keys.  The shell task feeds kbd_frame(), the ui task calls
+ * kbd_apply(): two tasks, one kbd_t, so one mutex around both (kbd.h). */
+static kbd_t      kbd;
+static os_mutex_t kbd_lock;
+static volatile uint8_t bal_on = 1;         /* shell -> ui: quiet / loud     */
 
 static void say(const char *fmt, ...)
 {
@@ -213,6 +224,9 @@ static void task_ui(void *arg)
         os_delay_until(&last, 20);
         uint32_t now = os_ticks();
         pad_read(&p);
+        os_mutex_lock(&kbd_lock);
+        kbd_apply(&kbd, &p, now);       /* the station's keys, into the same pad */
+        os_mutex_unlock(&kbd_lock);
         beep_poll(now);
 
         v_cmd = (float)p.y * V_PER_STICK;
@@ -236,7 +250,7 @@ static void task_ui(void *arg)
 
         /* $BAL,<ms>,<mode>,<tilt mdeg>,<estimate mdeg>,<x mm>,<speed mm/s>,<mV>,<fallen>,<payload g>
          * every 100 ms.  Integers: newlib-nano's printf has no %f. */
-        if (++n % 5u == 0u) {
+        if (++n % 5u == 0u && bal_on) {
             const estimate_t *e = control_estimate();
             send_frame("BAL,%lu,%d,%ld,%ld,%ld,%ld,%ld,%u,%ld", (unsigned long)now, control_mode(),
                        (long)(tr.th * 57295.78f), (long)(e->th * 57295.78f),
@@ -250,6 +264,22 @@ static void task_ui(void *arg)
  *  The display task - 10 Hz, the least urgent: it can take its time on I2C
  * ============================================================================ */
 static view_t view;
+
+/* The OLED mirror, for the station: after each flush, at most 2 $FB frames,
+ * and only while the UART has room for a whole one - so the mirror does not
+ * make this task wait for the link (unless another task fills the ring in the
+ * moment between the check and the send).  The frame buffer is static: task
+ * stacks are small.  say() keeps a frame from being cut in two by another
+ * task's line. */
+static void mirror_send(void)
+{
+    static char frame[MIRROR_FRAME_MAX];
+    for (int i = 0; i < 2 && uart_tx_room() >= MIRROR_FRAME_MAX; i++) {
+        size_t n = mirror_next(frame, sizeof frame, os_ticks());
+        if (n == 0) { break; }
+        say("%s", frame);
+    }
+}
 
 static void task_display(void *arg)
 {
@@ -268,6 +298,7 @@ static void task_display(void *arg)
         view_history(&view, tr.th);
         view_draw(&view);
         oled_flush();                 /* only the pages that changed go on the bus */
+        mirror_send();                /* ...and the station's copy of the screen  */
         uint16_t dt = (uint16_t)(now_us() - t0);
         us_disp = dt;
         if (dt > us_disp_max) { us_disp_max = dt; }
@@ -297,6 +328,44 @@ static void cmd_stats(void)
     }
 }
 
+/* The keys the station sends.  The caller holds print_lock (or the scheduler
+ * has not started yet). */
+static void print_keys(void)
+{
+    printf("  keys     : arrows = stick, a = stand up, b/p = push, s = next controller,\n"
+           "             1-5 = payload, - / + = smaller / bigger push, ? = this list\n");
+}
+
+/* A line starting with '$' is a station frame, never a command: $KEY goes to
+ * the keyboard, $MIRROR to the mirror.  Neither prints a word - a reply to
+ * every key would flood the link - and any other '$' line is dropped as
+ * quietly.  Only what a key DOES may print: ? lists the keys, - and + say the
+ * new push. */
+static void station_line(const char *line)
+{
+    if (kbd_is_key(line)) {
+        uint32_t now = os_ticks();
+        os_mutex_lock(&kbd_lock);
+        int cmd = kbd_frame(&kbd, line, now);
+        os_mutex_unlock(&kbd_lock);
+        if (cmd == KBD_HELP) {
+            os_mutex_lock(&print_lock);
+            print_keys();
+            os_mutex_unlock(&print_lock);
+        } else if (cmd == KBD_SLOWER || cmd == KBD_FASTER) {
+            /* nothing here has a pace to slow: - and + size button B's push */
+            long mns = (long)(push_size * 1000.0f + 0.5f);
+            mns += cmd == KBD_FASTER ? 50 : -50;
+            if (mns < 50)  { mns = 50; }
+            if (mns > 1000) { mns = 1000; }
+            push_size = (float)mns / 1000.0f;
+            say("button B pushes %ld mN s\n", mns);
+        }
+    } else {
+        (void)mirror_frame(line, os_ticks());
+    }
+}
+
 static void task_shell(void *arg)
 {
     (void)arg;
@@ -308,6 +377,7 @@ static void task_shell(void *arg)
         if (n == 0) { continue; }
         line[n] = '\0';
         n = 0;
+        if (line[0] == '$') { station_line(line); continue; }   /* before the parser */
         char *arg1 = strchr(line, ' ');
         long v = arg1 ? strtol(arg1 + 1, 0, 10) : -1;
         if (arg1) { *arg1 = '\0'; }
@@ -333,8 +403,14 @@ static void task_shell(void *arg)
             say("LQR K x1000 = [%ld %ld %ld %ld]  (u = -K [x, x_dot, theta, theta_dot])\n",
                 (long)(LQR_K[0] * 1000.0f), (long)(LQR_K[1] * 1000.0f),
                 (long)(LQR_K[2] * 1000.0f), (long)(LQR_K[3] * 1000.0f));
+        } else if (strcmp(line, "quiet") == 0) {
+            bal_on = 0;
+            say("quiet: $BAL off - type loud to resume\n");
+        } else if (strcmp(line, "loud") == 0) {
+            bal_on = 1;
+            say("loud: $BAL on\n");
         } else {
-            say("commands: stats  mode 0|1|2  noise <%%>  alpha <%%>  vbat <tenths V>  push <mN s>  k\n");
+            say("commands: stats  mode 0|1|2  noise <%%>  alpha <%%>  vbat <tenths V>  push <mN s>  k  quiet  loud\n");
         }
     }
 }
@@ -363,7 +439,11 @@ int main(void)
            (int)VBAT, (int)(VBAT * 10.0f) % 10, (int)(IMU_TILT * 57.3f), (int)(IMU_TILT * 573.0f) % 10);
     printf("  control  : LQR (SEL cycles PID tilt -> cascade -> LQR)\n");
     printf("  buttons  : A stand up, B push, knob payload, stick drive\n");
-    printf("  shell    : stats  mode  noise  alpha  vbat  push  k\n\n");
+    printf("  shell    : stats  mode  noise  alpha  vbat  push  k  quiet  loud\n");
+    printf("  station  : python tools/station/station.py - the robot large, keys up and down\n");
+    print_keys();
+    printf("\n");
+    kbd_init(&kbd);
 
     os_task_create("world",   task_world,   0, stk_world, 160, 5);
     os_task_create("control", task_control, 0, stk_ctrl,  160, 4);

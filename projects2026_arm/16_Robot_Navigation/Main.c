@@ -14,9 +14,14 @@
  *   task "robot" (40 ms)   nav.c:   control_step(&sensors, &actuators)
  *   task "ui"    (20 ms)   pad: A start/reset, B next level, SEL show truth,
  *                          knob speed, joystick moves the goal; $NAV frames;
- *                          every 5th time, view.c -> oled.c: the OLED frame
- *   task "shell"           the serial line: commands, and $GOAL/$MAP frames
- *                          from host/planner.py
+ *                          every 5th time, view.c -> oled.c: the OLED frame,
+ *                          and its copy for the station (mirror.h)
+ *   task "shell"           the serial line: commands, $GOAL/$MAP frames from
+ *                          host/planner.py, $KEY/$MIRROR from the station
+ *
+ * The station, python tools/station/station.py, draws the robot's map large
+ * and sends the pad's controls as keys (kbd.h): arrows = stick, a = A,
+ * b = B, s = SEL, 1-5 = knob.  "quiet" / "loud" stop and restart $NAV.
  *
  * This file is the HARNESS: it alone sees both halves, so it can draw the
  * true pose beside the estimated one and report what the robot cannot know.
@@ -38,6 +43,8 @@
 #include "i2c.h"
 #include "oled.h"
 #include "pad.h"
+#include "kbd.h"
+#include "mirror.h"
 #include "beep.h"
 #include "sim.h"
 #include "levels.h"
@@ -64,6 +71,7 @@ static actuators_t shared_cmd;
 static os_mutex_t world_lock;      /* world.c's state: world, view, shell, ui  */
 static os_mutex_t nav_lock;        /* nav.c's state:   robot, view, shell, ui  */
 static os_mutex_t print_lock;      /* whole lines on the serial port           */
+static os_mutex_t kbd_lock;        /* the station's keys: shell feeds, ui reads */
 /* Lock order, everywhere: world_lock, then nav_lock.  Never the other way
  * round, or two tasks can each hold one and wait for the other for ever. */
 
@@ -72,6 +80,8 @@ static volatile uint32_t run_start;        /* world time when RUN began      */
 static volatile uint32_t ctrl_cycles_max, world_cycles_max, flush_ms_max;
 static volatile int      level = 0;
 static volatile uint8_t  custom_loaded;
+static volatile uint8_t  nav_quiet;        /* "quiet": no periodic $NAV      */
+static kbd_t             kbd;              /* under kbd_lock                 */
 
 /* ============================================================================
  *  The planner's stopwatch: CPU cycles, from SysTick
@@ -311,6 +321,24 @@ static void send_nav(void)
  * the dirty pages over I2C with no lock held (the bus is this task's alone). */
 static volatile uint8_t oled_ok;
 
+/* The station's copy of the screen (mirror.h): after each flush, at most two
+ * $FB frames, and only while the UART's ring has room for a whole one - so
+ * the mirror falls behind rather than ever making this task wait.  The room
+ * is checked with print_lock held, so no other task can fill the ring between
+ * the check and the write, and no line can land inside a frame.  `frame` is
+ * static: 96 B of RAM once, not 96 B more of this task's stack. */
+static void mirror_send(void)
+{
+    static char frame[MIRROR_FRAME_MAX];
+    os_mutex_lock(&print_lock);
+    for (int i = 0; i < 2 && uart_tx_room() >= MIRROR_FRAME_MAX; i++) {
+        size_t n = mirror_next(frame, sizeof frame, os_ticks());
+        if (n == 0) { break; }                  /* not asked for, or nothing new */
+        _write(1, frame, (int)n);
+    }
+    os_mutex_unlock(&print_lock);
+}
+
 static void draw_frame(void)
 {
     uint32_t run_ms = 0;
@@ -328,6 +356,7 @@ static void draw_frame(void)
         uint32_t d = os_ticks() - t0;
         if (d > flush_ms_max) { flush_ms_max = d; }
     }
+    mirror_send();
 }
 
 static void task_ui(void *arg)
@@ -339,6 +368,9 @@ static void task_ui(void *arg)
         os_delay_until(&last, 20);
         uint32_t now = os_ticks();
         pad_read(&p);
+        os_mutex_lock(&kbd_lock);                        /* the station's keys, */
+        kbd_apply(&kbd, &p, now);                        /* into the same pad   */
+        os_mutex_unlock(&kbd_lock);
         beep_poll(now);
 
         if (p.adc_ok) {                                  /* knob: 100..400 mm/s */
@@ -374,7 +406,7 @@ static void task_ui(void *arg)
         }
         if ((int32_t)(now - next_nav) >= 0) {             /* $NAV at 4 Hz */
             next_nav = now + 250u;
-            send_nav();
+            if (!nav_quiet) { send_nav(); }               /* "quiet" stops it */
         }
         if (++frame % 5u == 0u) { draw_frame(); }         /* the OLED at 10 Hz */
     }
@@ -495,14 +527,45 @@ static void dispatch(char **f, int n)
     } else if (is(f[0], "REACT") && n == 2)   { P->reactive = (uint8_t)(a != 0);
     } else if (is(f[0], "CAL") && n == 2)     { P->gyro_cal = (uint8_t)(a != 0);
     } else if (is(f[0], "WHEELS") && n == 2)  { P->heading = (uint8_t)(a ? HEAD_WHEELS : HEAD_GYRO);
+    } else if (is(f[0], "QUIET"))   { nav_quiet = 1;               /* $NAV off: a person can type */
+    } else if (is(f[0], "LOUD"))    { nav_quiet = 0;
     } else if (is(f[0], "STATS")) { cmd_stats(); return;
     } else if (is(f[0], "DUMP"))  { cmd_map();   return;
     } else {
         say("go  reset  level N  goal X Y  speed MM_S  inflate 0-2  react 0|1  cal 0|1\n");
-        say("wheels 0|1  stats  dump    - or as frames: $GOAL,x,y  $MAP,y,hex  $START,x,y\n");
+        say("wheels 0|1  stats  dump  quiet  loud    - or as frames: $GOAL,x,y  $MAP,y,hex  $START,x,y\n");
         return;
     }
     send_frame("ACK,%s,%d,%d", f[0], a, b);
+}
+
+/* The station's keys, the same list the banner prints. */
+static const char KEYS[] =
+    "  keys     : arrows = stick (moves the goal), a = A, b/p = B, s = SEL, 1-5 = knob, ? = this\n";
+
+/* The station's two frames, taken before the shell's own parser sees them:
+ * $KEY,<key>,<1|0>  a key down or up       -> kbd.c, applied by task "ui"
+ * $MIRROR,<0|1>     "send me the screen"   -> mirror.c, sent by task "ui"
+ * Both arrive several times a second, so neither is ever answered - no $ACK,
+ * no $NAK for a bad checksum (the station repeats them anyway), no echo.
+ * Returns 1 if the line was one of them. */
+static int station_frame(const char *line)
+{
+    uint32_t now = os_ticks();
+    if (kbd_is_key(line)) {
+        os_mutex_lock(&kbd_lock);
+        int r = kbd_frame(&kbd, line, now);
+        os_mutex_unlock(&kbd_lock);
+        if (r == KBD_HELP) { say("%s", KEYS); }      /* the one key that answers */
+        /* KBD_SLOWER / KBD_FASTER (- +): nothing here - the robot's speed is
+         * the knob's, and the keys 1-5 already set the knob. */
+        return 1;
+    }
+    if (strncmp(line, "$MIRROR,", 8) == 0) {
+        mirror_frame(line, now);                     /* ignores a bad checksum */
+        return 1;
+    }
+    return 0;
 }
 
 static void task_shell(void *arg)
@@ -516,6 +579,7 @@ static void task_shell(void *arg)
         if (n == 0) { continue; }
         line[n] = '\0';
         n = 0;
+        if (station_frame(line)) { continue; }        /* $KEY, $MIRROR: silent */
         char *f[3] = { 0 }, *text = line, sep = ' ';
         if (line[0] == '$') {                         /* a frame: check it first */
             const char *body;
@@ -553,8 +617,11 @@ int main(void)
     boot("  RAM      : navigation %lu B, of which A* %lu B\n",
            (unsigned long)nav_ram_bytes(), (unsigned long)astar_ram_bytes());
     boot("  controls : A start/restart  B next level  SEL show true walls  knob speed  stick moves goal\n");
-    boot("  shell    : type help\n\n");
+    boot("  station  : python tools/station/station.py - the map large, these controls as keys\n");
+    boot("%s", KEYS);
+    boot("  shell    : type help; quiet / loud stop and restart $NAV\n\n");
 
+    kbd_init(&kbd);
     load_level_unlocked(0);           /* no locks yet: the kernel has not started */
 
     os_task_create("world", task_world, 0, stk_world,  96, 4);

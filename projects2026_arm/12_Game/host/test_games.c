@@ -27,6 +27,7 @@
 #include "i2c.h"
 #include "proto.h"
 #include "kbd.h"
+#include "mirror.h"
 
 /* ============================================================================
  *  The stubs: an I2C bus that only counts, and the two platform hooks
@@ -135,6 +136,15 @@ static int kbd_type(kbd_t *k, const char *s, uint32_t now)
     int cmd = KBD_NONE;
     for (; *s; s++) { int c = kbd_feed(k, (uint8_t)*s, now); if (c != KBD_NONE) { cmd = c; } }
     return cmd;
+}
+
+/* One $KEY frame from the station, checksum and all. */
+static int kbd_key(kbd_t *k, const char *key, int down, uint32_t now)
+{
+    char body[16], line[24];
+    int n = snprintf(body, sizeof body, "KEY,%s,%d", key, down);
+    snprintf(line, sizeof line, "$%s*%02X", body, (unsigned)proto_checksum(body, (size_t)n));
+    return kbd_frame(k, line, now);
 }
 
 /* SNAKE: of the moves that do not die at once, prefer those that leave room
@@ -493,6 +503,72 @@ int main(int argc, char **argv)
     int k4 = kp.knob;
     kp = no_input(0); kp.knob = 900; kbd_apply(&kb, &kp, now + 1420);
     CHECK(k4 == 700 && kp.knob == 900, "4 sets the knob to 700 (level 4) until the real knob turns (now %d)", kp.knob);
+
+    /* The station's $KEY frames: real key-down and key-up. */
+    kbd_init(&kb);
+    now = 3000;
+    kbd_key(&kb, "LEFT", 1, now);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 500);
+    int left_held = kp.x;
+    kbd_key(&kb, "LEFT", 0, now + 510);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 511);
+    CHECK(left_held == -100 && kp.x == 0, "$KEY,LEFT,1 holds the stick left for 500 ms (x %d); $KEY,LEFT,0 lets go at once (x %d)",
+          left_held, kp.x);
+    kbd_key(&kb, "UP", 1, now + 600);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 600 + KBD_LIVE_MS + 1);
+    CHECK(kp.y == 0, "a station key never renewed lets go after %u ms (lost key-up)", (unsigned)KBD_LIVE_MS);
+    kbd_key(&kb, "a", 1, now + 2000);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2000);
+    int a_press = kp.pressed, a_down1 = kp.down;
+    kbd_key(&kb, "a", 1, now + 2200);                     /* the station's 200 ms repeat */
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2220);
+    int a_press2 = kp.pressed, a_down2 = kp.down;
+    kbd_key(&kb, "a", 0, now + 2300);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2320);
+    CHECK(a_press == PAD_A && a_down1 == PAD_A && a_press2 == 0 && a_down2 == PAD_A && kp.down == 0,
+          "$KEY,a: one press, held down through a repeat, up on $KEY,a,0");
+    char bad_key[] = "$KEY,UP,1*00";
+    CHECK(kbd_frame(&kb, bad_key, now + 2400) == KBD_NONE && kb.dy == 0, "a $KEY with a wrong checksum is ignored");
+    CHECK(kbd_key(&kb, "-", 1, now + 2500) == KBD_SLOWER && kbd_key(&kb, "-", 0, now + 2510) == KBD_NONE,
+          "$KEY,-,1 is KBD_SLOWER; its key-up does nothing");
+    char line[24];
+    snprintf(line, sizeof line, "$KEY,RIGHT,1*%02X\r", (unsigned)proto_checksum("KEY,RIGHT,1", 11));
+    kbd_type(&kb, line, now + 2600);
+    kp = no_input(0); kbd_apply(&kb, &kp, now + 2700);
+    CHECK(kp.x == 100 && kb.wlen == 0, "a $KEY line arriving byte by byte through kbd_feed() works too (x %d)", kp.x);
+
+    /* ---- the OLED mirror: the screen to the station, in 32-byte segments --- */
+    printf("\nMIRROR (mirror.c, the OLED for the station)\n");
+    reset_panel();
+    oled_clear();
+    char fr[MIRROR_FRAME_MAX];
+    now = 20000;
+    CHECK(mirror_next(fr, sizeof fr, now) == 0, "silent until the station asks: no $FB to a plain terminal");
+    char req[24];
+    snprintf(req, sizeof req, "$MIRROR,1*%02X", (unsigned)proto_checksum("MIRROR,1", 8));
+    int took = mirror_frame(req, now);
+    int frames_all = 0, longest = 0, all_ok = 1;
+    size_t n;
+    while ((n = mirror_next(fr, sizeof fr, now)) != 0 && frames_all < 100) {
+        frames_all++;
+        if ((int)n > longest) { longest = (int)n; }
+        fr[n - 1] = 0;                                    /* drop the newline */
+        const char *b; size_t bl;
+        if (proto_check(fr, &b, &bl) != PROTO_OK || strncmp(b, "FB,", 3) != 0) { all_ok = 0; }
+    }
+    CHECK(took && frames_all == 32 && all_ok, "$MIRROR,1 -> the whole screen once: %d frames (8 pages x 4), all pass the checksum", frames_all);
+    CHECK(longest <= (int)MIRROR_FRAME_MAX - 1, "longest $FB frame %d B, under MIRROR_FRAME_MAX %u", longest, (unsigned)MIRROR_FRAME_MAX);
+    CHECK(mirror_next(fr, sizeof fr, now + 1) == 0, "then nothing, until something changes");
+    oled_pixel(70, 20, OLED_ON);                          /* page 2, columns 64..95 */
+    n = mirror_next(fr, sizeof fr, now + 2);
+    fr[n ? n - 1 : 0] = 0;
+    CHECK(n && strncmp(fr, "$FB,2,64,", 9) == 0 && mirror_next(fr, sizeof fr, now + 3) == 0,
+          "one pixel at (70, 20) sends one segment: %.9s...", n ? fr : "(none)");
+    n = mirror_next(fr, sizeof fr, now + MIRROR_REFRESH_MS + 10);
+    CHECK(n != 0, "with nothing changed, one segment is re-sent every %u ms anyway", (unsigned)MIRROR_REFRESH_MS);
+    CHECK(mirror_next(fr, sizeof fr, now + MIRROR_LIVE_MS + 10) == 0, "no $MIRROR,1 for %u ms: it stops", (unsigned)MIRROR_LIVE_MS);
+    printf("        bandwidth: a whole screen is 32 x %d B = %d B = %.0f ms at 115200 baud; one segment %.1f ms\n",
+           longest, 32 * longest, 32.0 * longest * 10.0 / 115.2, longest * 10.0 / 115.2);
 
     reset_panel();                                        /* the arcade, played by keys */
     arcade_init();

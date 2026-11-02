@@ -40,8 +40,8 @@ host\run.bat
 The build must say zero warnings and roughly:
 
 ```
-           FLASH:       16648 B        32 KB     50.81%
-             RAM:       10280 B        12 KB     83.66%
+           FLASH:       18780 B        32 KB     57.31%
+             RAM:       10552 B        12 KB     85.87%
 ```
 
 ### Guess first
@@ -80,6 +80,39 @@ Which task uses the most CPU? Which stack is closest to full?
 > sized from a static estimate (README, "Memory budget"); the printing tasks
 > — `shell`, `telem`, `health` — are the ones to watch. **Write down what you
 > actually see.** If a stack is above 90 %, that is a real finding: report it.
+
+---
+
+## Part 1b — Run it from the station (10 min)
+
+### Do this
+
+With the simulation running, from the repository root:
+
+```
+python tools/station/station.py
+```
+
+Click the OLED picture and steer with the arrow keys: `a` brakes, `b`
+restarts, `1`-`5` set the knob, `?` prints the key list. Type `stats` in the
+station's console. Then type `quiet`, watch the view, and `loud`.
+
+### Guess first
+
+The station needs the OLED's 1 KB picture over the same 115 200-baud link as
+`$APP` and `$SYS`. **Does copying it slow the game down?** And what does the
+view show after `quiet`?
+
+> **What you see and why** (Wokwi — **not yet watched**; this is the
+> prediction). The game does not slow down: the mirror is sent from `display`,
+> the lowest periodic task, at most two 78-byte frames after each flush and
+> only while the UART ring has room for a whole one, so it falls behind
+> instead of waiting. Only the parts of the screen that changed are sent.
+> The arrows hold the stick for exactly as long as you hold the key (the
+> station sends a key-up; a terminal cannot). After `quiet` the view says
+> no `$APP` has arrived for a few seconds - the board is fine, it is just
+> silent; `loud` brings the frames back. `-` and `+` do nothing in steer:
+> `shell.c`'s `station_frame()` is where your project gives them a meaning.
 
 ---
 
@@ -213,6 +246,9 @@ Does it crash? When?
    platform and `CHECK`, and write **one** test of your MVP's first rule
    (a collision, a state change, a score).
 4. `host\run.bat` passes; `build.bat` has zero warnings. Commit.
+5. Copy `tools/station/views/l19_final.py` to `l19_<yourname>.py` beside it,
+   rename your telemetry frame (`$ROBO`, not `$APP`) and set
+   `frames = ("ROBO", "SYS")` - README, "Your project's view".
 
 > This is the end of the guided part. From here the project is yours —
 > Section B is the map.

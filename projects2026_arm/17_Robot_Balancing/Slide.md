@@ -858,7 +858,7 @@ contest on exactly this.
 | `world` | 5 | 1 ms | apply requests, `world_step`, `world_sense`, publish | 160 words |
 | `control` | 4 | 5 ms | copy sensors, `control_step`, publish volts | 160 |
 | `ui` | 3 | 20 ms | `pad_read`, buzzer, `$BAL` every 100 ms | 384 |
-| `shell` | 2 | on input | `stats mode noise alpha vbat push k` | 384 |
+| `shell` | 2 | on input | `stats mode noise alpha vbat push k quiet loud`; the station's `$KEY`, `$MIRROR` | 384 |
 | `display` | 1 | 100 ms | `view_draw`, `oled_flush` over I²C | 384 |
 
 **One writer per variable.** `world_t` belongs to the world task alone; the
@@ -1019,7 +1019,7 @@ Read honestly:
   `--pid` eigenvalues for tilt-only control.
 - `sitl.c`: every number on slides 9, 12, 14, 19 and 25; determinism; the
   OLED frame drawn pixel by pixel.
-- Firmware: **builds with zero warnings**, FLASH 23 960 B, RAM 10 144 B.
+- Firmware: **builds with zero warnings**, FLASH 26 280 B, RAM 10 408 B.
 
 **Not measured:**
 
@@ -1027,7 +1027,8 @@ Read honestly:
   estimates; `stats` will give the real ones.
 - **Not watched in Wokwi.** The OLED, buttons, knob and buzzer are wired as
   the shared app board is, and `pad.c`/`oled.c` are shared with lessons 12–16,
-  but this lesson's screen has only been drawn on a PC.
+  but this lesson's screen has only been drawn on a PC. Nor has the route
+  to the PC's station (`tools/station/station.py`: `$KEY` in, `$FB` out).
 - **The model is a model.** No slip, no motor inductance, no gear backlash, a
   flat floor. A real robot would need its gains re-checked.
 

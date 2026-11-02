@@ -1164,6 +1164,11 @@ game knows which one moved it. A terminal reports a key going **down**, never
 up, so a held arrow is inferred: each arrival holds the stick 150 ms and the
 PC's auto-repeat keeps renewing it.
 
+**The station** (`tools/station/station.py`) removes the guess: it sends
+`$KEY,RIGHT,1` when a key goes down and `$KEY,RIGHT,0` when it comes up, and
+draws the OLED large from `$FB` frames the board sends while asked. The
+board computes; the PC draws — the split every drone ground station uses.
+
 ---
 
 ## Slide 17: Sprites — and Why `const` Is Enough on ARM
@@ -1506,13 +1511,13 @@ From this build (`arm-none-eabi-size -A Main.elf`):
 
 | Section | Bytes | What |
 |---|---:|---|
-| `.text` | 15 340 | code: three games, menu, engine, oled, i2c, pad, adc, beep, keyboard, printf |
-| `.rodata` | 1 948 | the font (475 B), sprites, note tables, strings |
+| `.text` | 16 844 | code: three games, menu, engine, oled, i2c, pad, adc, beep, keyboard, mirror, printf |
+| `.rodata` | 2 108 | the font (475 B), sprites, note tables, strings |
 | `.data` | 132 | initialised variables |
-| `.bss` | 2 620 | framebuffer 1 032, snake ring 806, the rest |
+| `.bss` | 3 224 | framebuffer 1 032, snake ring 806, serial rings 544, the rest |
 | stack + heap | 1 536 | reserved by the linker script |
 
-**FLASH 17 608 B of 32 KB (53.7 %), RAM 4 288 B of 12 KB (34.9 %).** Room for
+**FLASH 19 272 B of 32 KB (58.8 %), RAM 4 896 B of 12 KB (39.8 %).** Room for
 a fourth game — Lab Part 8.
 
 The largest piece of code is not a game: newlib-nano's `printf` machinery

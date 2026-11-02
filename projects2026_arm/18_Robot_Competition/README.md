@@ -30,9 +30,12 @@ robin — on a PC.
 | `referee.h`, `referee.c` | rules, seeded start positions, same-instant sensing, cycle measurement hook, the roster, `tour_seed()` |
 | `bots.c` | the five opponents |
 | `scene.h`, `scene.c` | the OLED picture, drawn from a snapshot |
-| `Main.c` | RTOS tasks (sim / shell / oled), menu, SysTick cycle clock, build ID, `$MATCH`/`$RESULT` frames |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled pad adc beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json` |
+| `Main.c` | RTOS tasks (sim / shell / oled), menu, SysTick cycle clock, build ID, `$MATCH`/`$RESULT` frames; for the station: `$ARENA` poses, `$KEY` keys, the OLED mirror |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled pad adc beep keys kbd mirror` |
+| `_lib/kbd.h`, `_lib/kbd.c` | (shared, `LIBS=keys kbd`) the station's `$KEY` down/up frames, written into the same `pad_t` the pins fill |
+| `_lib/mirror.h`, `_lib/mirror.c` | (shared, `LIBS=mirror`) the OLED, copied to the station as `$FB` frames while it asks |
+| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json`; `wokwi.toml` also forwards the serial port to the station (`rfc2217ServerPort = 4000`) |
+| `tools/station/views/l18_arena.py` | the station's view: the dohyo drawn large from `$ARENA`, standings from `$MATCH`/`$RESULT` |
 | `host/league.c` | physics checks, round-robin league, determinism check, the firmware's tournament, OLED picture check |
 | `host/run.bat`, `host/run.sh` | build + run; compile extra strategy files with name prefixes; reject files with globals (`nm`); compare `-O0`/`-O2`/`-Os` |
 | `host/register.h` | force-included into extra files: a constructor that registers `<name>_step` |
@@ -41,7 +44,7 @@ robin — on a PC.
 ## Build and run
 
 ```
-build.bat        # FLASH 27124 B / 32 KB, RAM 9608 B / 12 KB, zero warnings
+build.bat        # FLASH 29244 B / 32 KB, RAM 9872 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat                                        # built-ins + student.c
 host\run.bat host\strategies\alice.c host\strategies\bob.c -- -n 100 --tour alice
@@ -55,10 +58,29 @@ On the board: **B** next opponent (last item TOURNAMENT), **A** start/abort,
 Result line: `$RESULT,<name>,<W>,<D>,<L>,<hash>,<max cycles>,<build>*CS`
 (NMEA XOR checksum, lesson 08). Per match: `$MATCH,<robot0>,<robot1>,<seed>,<winner 0/1/-1>,<rounds0>,<rounds1>,<hash>*CS`.
 
+**Run it from the station.** With the simulation running in VS Code,
+`python tools/station/station.py` (repository root) draws the dohyo large —
+both robots with their headings, names, round score and clock — keeps the
+standings from every `$MATCH` and `$RESULT`, shows the OLED copied from
+`_lib/mirror.c`, and sends real key-down/up for every control: arrows = the
+stick (fun mode), **a** = A, **b** = B, **s** = SEL, **1**–**5** = speed
+x1/x2/x4/x8/MAX, **?** = the key list (`-` and `+` do nothing here: 1–5
+already pick every speed). While the station is connected, and only then,
+the display task also sends, during a match,
+`$ARENA,<round>,<phase>,<t_ms>,<won0>,<won1>,<x0>,<y0>,<th0>,<x1>,<y1>,<th1>,<name0>,<name1>*CS`
+(mm, mrad) every 80 ms — about 70 B, under 1 KB/s of the link's ~11. It is
+built from the display's copy of the snapshot, so it cannot touch the
+simulation: the host hashes are unchanged, and the board's `$RESULT` should
+be the same with or without the station. `$KEY` and `$MIRROR` lines never
+produce output. **Not yet watched in Wokwi**: the view has run only against
+frames built from the firmware's format strings.
+
 **Flash is the tight resource.** A first draft that parsed the shell with
 `sscanf()` was 30 068 B — over the 29 KB line; replacing it with an 11-line
 parser saved 2.7 KB, and one out-of-line copy of `f_sin`/`f_cos` 0.5 KB more
-(with bit-identical host results). About 2 KB remain for students' code.
+(with bit-identical host results). The station link (keys, OLED mirror,
+`$ARENA`) then cost 2.1 KB: about 0.4 KB remain under the 29 KB line, 3.4 KB
+under the 32 KB the chip has.
 
 ## Facts checked against sources, not memory
 
@@ -112,7 +134,7 @@ self-outs — his edge-walking idea, measured.
 
 ## Status
 
-**Builds with zero warnings** (FLASH 27 124 B, RAM 9 608 B). The world,
+**Builds with zero warnings** (FLASH 29 244 B, RAM 9 872 B). The world,
 referee, strategies and drawing code are **verified on the host** as above.
 
 **Not yet watched running in Wokwi**, and nothing here has executed on a
@@ -128,3 +150,6 @@ Cortex-M0+. When someone does, look first at:
 3. **The OLED and controls**: the ring and both robots drawn (open = student,
    filled = bot), HORZ direction on the joystick in fun mode (right should
    turn right), the countdown beeps, and that the display keeps updating at x8.
+4. **The station** (`tools/station/station.py`): the arena view follows the
+   OLED, the keys drive the menu, and `$RESULT` at seed 2026 still carries
+   `3AA81370` with the station connected. Not yet tried against Wokwi.

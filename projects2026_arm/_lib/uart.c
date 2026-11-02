@@ -73,6 +73,15 @@ uint8_t uart_getc(void)
 
 const volatile uart_stats_t *uart_stats(void) { return &stats; }
 
+/* Free slots in the transmit ring (one is always kept empty).  A caller that
+ * must never wait - the OLED mirror - checks this before it prints.  Each
+ * '
+' becomes two bytes on the way in: count it twice. */
+uint32_t uart_tx_room(void)
+{
+    return (uint32_t)((tx_tail + TX_SIZE - tx_head - 1u) % TX_SIZE);
+}
+
 /* ---- the one interrupt, three jobs ----------------------------------------- */
 void USART2_IRQHandler(void)
 {

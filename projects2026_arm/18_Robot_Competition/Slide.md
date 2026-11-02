@@ -823,17 +823,21 @@ and worst `match_step()` in cycles. That is Lab Part 1's first number.
 | first draft, shell parsed with `sscanf()` | 30 068 B | 92 % — over the 29 KB line |
 | `sscanf()` replaced by an 11-line `number()` | 27 392 B | |
 | `fmath.h`'s `f_sin`/`f_cos` called through one out-of-line copy | 27 056 B | 83 % |
-| `i2c.c` and `beep.c` fixed for Wokwi (lesson 12, 2026-11-01) | **27 124 B** | 83 % |
+| `i2c.c` and `beep.c` fixed for Wokwi (lesson 12, 2026-11-01) | 27 124 B | 83 % |
+| the station link: `$KEY` keys, OLED mirror, `$ARENA` poses | **29 244 B** | 89 % |
 
 `sscanf` dragged in `_scanf_i`, `__ssvfscanf_r` and `strtol`/`strtoul` —
 **2.7 KB for parsing two numbers**. `fmath.h`'s functions are `static inline`,
 so each call site got its own polynomial; one out-of-line copy saved 0.5 KB
 with **bit-identical results** (the host hash did not change).
 
-RAM: **9 608 B** of 12 KB — three task stacks (512 + 384 + 384 words), the
+RAM: **9 872 B** of 12 KB — three task stacks (512 + 384 + 384 words), the
 OLED's 1 KB framebuffer, the match.
 
-What is left — about 2 KB under the line — is **your** `student.c`'s budget.
+What is left — about 0.4 KB under the line, 3.4 KB under 32 KB — is **your**
+`student.c`'s budget. The station (`python tools/station/station.py`) costs
+2.1 KB of it and only watches: `$ARENA` is built from the display's copy of
+the snapshot, so the `$RESULT` hash cannot change. Not yet watched in Wokwi.
 
 ---
 

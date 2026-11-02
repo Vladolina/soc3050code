@@ -63,6 +63,8 @@ projects2026_arm/**/host/**/*.exe
 projects2026_arm/**/host/**/*.out
 projects2026_arm/**/host/__pycache__/
 projects2026_arm/_build/__pycache__/
+tools/station/**/__pycache__/
+tools/pylib/**/__pycache__/
 projects2026_arm/11_Faults_Watchdog_Power/host/objdump.txt
 
 # The board manual is committed once, in projects2026_arm/_docs/. The renderer

@@ -24,16 +24,16 @@ waypoints, altitude, battery, wind.
 | | |
 |---|---|
 | `Slide.md` | the lecture - 31 pages as rendered: the title, the two pin-map slides, then the numbered slides, each register block's one-page map before its details |
-| `Lab.md` | the lab: Parts 0–8, ~2 hours, three contests, **nothing handed in** |
-| `Main.c` | five RTOS tasks (world, ctl, link, tel, ui), three locks, the shell (`stats params mission tel`), SysTick cycle stamps |
+| `Lab.md` | the lab: Parts 0–9 (9: the station), ~2 hours, three contests, **nothing handed in** |
+| `Main.c` | five RTOS tasks (world, ctl, link, tel, ui), four locks, the shell (`stats params mission tel quiet loud`), the station's keys and OLED mirror, SysTick cycle stamps |
 | `control.h` | the plant/controller contract: `sensors_t`, `actuators_t`, `control_step()` |
 | `world.c`, `world.h` | **pure C.** The simulated drone: tilted thrust, linear drag on airspeed, OU gusts from xorshift32, battery ∝ thrust^1.5, delayed GPS, baro, biased accelerometer |
 | `flight.c`, `flight.h` | **pure C.** Estimator, cascade, modes (DISARMED TAKEOFF HOLD MISSION RTL LAND), line following, mission validation, pre-arm, failsafes, `$PARAM` table |
 | `mavlite.c`, `mavlite.h` | **pure C.** Strict frame parser (`$WP $MISSION $MODE $ARM $DISARM $PARAM $PING`) and telemetry builders (`$POS $TRU $EVT $MIS $ACK`) |
 | `ui.c`, `ui.h` | **pure C.** The OLED map and panel, drawn into `oled.c`'s RAM framebuffer |
 | `fm.c`, `fm.h` | `fmath.h`'s sin/cos/atan2/sqrt/wrap compiled once (saves 720 B of flash — slide 25) |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json`; `wokwi.toml` adds lesson 08's `rfc2217ServerPort = 4000` |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror` - the last three for the station |
+| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json`; `wokwi.toml` adds lesson 08's `rfc2217ServerPort = 4000`, the station's and `mission.py --port`'s route |
 | `host/sitl.c` | software-in-the-loop: flies the four pure-C files on the PC; every test, `--parse`, `--fly`, `--hold` |
 | `host/run.bat`, `host/run.sh` | build and run all host tests; exit non-zero on any failure |
 | `host/mission.py` | the ground station, standard library only: mission file → frames, `--gen`, `--port` (pyserial, as lesson 08), `--score`, `--race`, `--verify-mis` |
@@ -44,7 +44,7 @@ waypoints, altitude, battery, wind.
 ## Build and run
 
 ```
-build.bat        # FLASH 27496 B / 32 KB (83.9 %), RAM 10520 B / 12 KB (85.6 %), zero warnings
+build.bat        # FLASH 29600 B / 32 KB (90.3 %), RAM 10776 B / 12 KB (87.7 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
 python host\mission.py host\default.mission          # frames to type/paste into Wokwi
@@ -55,6 +55,46 @@ Task stacks are 160/224/320/288/288 words (world/ctl/link/tel/ui), sized from
 `-fstack-usage` plus the C library's prologues; `stats` prints the measured
 high-water marks. The first build used 384 words each and **did not link**
 (RAM 12 576 B, 102 %); see slide 25.
+
+## Run it from the station
+
+`tools/station/station.py` is the PC side of the app board: the OLED drawn
+large, every control on the keyboard, and this lesson's own picture of its
+telemetry. In VS Code, start the Wokwi simulation (`wokwi.toml` opens
+`rfc2217ServerPort = 4000`), then from the repository root:
+
+```
+python tools/station/station.py
+```
+
+The first `$POS` selects the view `tools/station/views/l14_mission.py`: a
+top-down map with the estimated track (`$POS`) and the true one (`$TRU`)
+side by side, the waypoints from `$MIS`, home, the 50 m fence, the drone and
+its heading; beside it the mode, battery and wind, altitude and
+estimate-error strip charts, and the `$EVT` log.
+
+Click the OLED or the view, and the keys are the board's controls:
+
+| Key | Does |
+|---|---|
+| arrows | the joystick - in HOLD, moves the hold point |
+| `a` | button A: fly the mission, or resume it |
+| `b` (or `p`) | button B: return to launch |
+| `s` | SEL: HOLD here |
+| `1` - `5` | the knob in fifths: wind 1, 3, 5, 7, 9 m/s |
+| `-` / `+` | cruise speed, 1 m/s a press (the same `$PARAM,CRUISE`, 0.5-12 m/s) |
+| `?` | prints this list |
+
+Type `quiet` (Enter) in the station's command line to stop `$POS` and `$TRU`
+- the map then stops too - and `loud` to restart them; `$EVT`, `$MIS` and
+`$ACK` always go out. `$KEY` and the station's `$MIRROR` heartbeat are taken
+before `mavlite.c`'s parser, so they are never NAK'd or counted as bad
+frames. `mission.py --port` still works on the same port (one program at a
+time).
+
+**Not yet watched in Wokwi.** The station route was built and the view
+tested on the PC against the SITL's real `$POS`/`$TRU`/`$EVT`/`$MIS` lines;
+nobody has yet flown the lesson from it.
 
 ## Facts checked against sources, not memory
 
@@ -112,7 +152,9 @@ reports `LANDED` — it cannot tell a crash from a landing.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 27 496 B, RAM 10 520 B.
+- Builds with **zero warnings**: FLASH 29 600 B, RAM 10 776 B. The station's
+  keys and OLED mirror (`keys kbd mirror` and their glue in `Main.c`) cost
+  2104 B of flash and 256 B of RAM over the 27 496 / 10 520 before them.
 - Host tests: **all pass** (above).
 - **Not yet watched running in Wokwi.** Nothing in this lesson has run on the
   simulated chip. When someone does, look first at:

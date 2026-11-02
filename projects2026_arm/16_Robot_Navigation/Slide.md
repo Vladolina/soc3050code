@@ -915,7 +915,9 @@ tearing the result (lesson 03). It wraps every 89 s; differences do not care.
 
 First build: **34 932 B of flash and 15 136 B of RAM** (counting the linker's
 1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now **29 216 B
-and 11 328 B**. What got it there, each measured build to build:
+and 11 328 B** — **31 100 B and 11 584 B** with the PC station's keys and OLED
+mirror (`LIBS += keys kbd mirror`; run `python tools/station/station.py`, not
+yet watched in Wokwi). What got it there, each measured build to build:
 
 | Change | Saved |
 |---|---|

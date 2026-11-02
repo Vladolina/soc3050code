@@ -30,16 +30,18 @@ cell.
 | `levels.c`, `levels.h` | the five arenas as text — also parsed by `planner.py` |
 | `view.c`, `view.h` | the OLED frame (pure C over `oled.h`'s framebuffer) |
 | `mathx.c`, `mathx.h` | one out-of-line copy of `fmath.h`'s functions (saves 552 B) |
-| `Main.c` | the harness: RTOS tasks world / robot / ui / shell, SysTick cycle counter, `$NAV` telemetry, one dispatcher for typed words and `$frames`, `stats`, `dump` |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board, unchanged from `_targets/app-board-diagram.json` |
+| `Main.c` | the harness: RTOS tasks world / robot / ui / shell, SysTick cycle counter, `$NAV` telemetry, one dispatcher for typed words and `$frames`, `stats`, `dump`, `quiet` / `loud`; the station's `$KEY` and `$MIRROR` |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror` |
+| `simulate.bat`, `diagram.json` | the app board, unchanged from `_targets/app-board-diagram.json` |
+| `wokwi.toml` | the VS Code extension's settings: GDB on port 3333, the serial port on `rfc2217://localhost:4000` for the station |
+| `tools/station/views/l16_nav.py` | (outside this folder) the station's view of this lesson: the robot's map, plan and poses, large |
 | `host/sitl.c`, `host/run.bat`, `host/run.sh` | the host test: every level, the lab's switches, "no path", open-list sizing, OLED frames as ASCII |
 | `host/planner.py` | the Python tier: print/plan levels, make frames, send them (`--port`), read captures (`--file`), compare with C (`--compare`) |
 
 ## Build and run
 
 ```
-build.bat          # FLASH 29216 B / 32 KB, RAM 11328 B / 12 KB, zero warnings
+build.bat          # FLASH 31100 B / 32 KB, RAM 11584 B / 12 KB, zero warnings
 simulate.bat       # paste diagram.json, upload Main.elf, press A
 host\run.bat       # or: bash host/run.sh - the whole robot on the PC, ~1 s
 python host\planner.py --level 4
@@ -53,14 +55,45 @@ state is 3288 B: map 448, costmap 448, path 256, A* 2112, vetoes 24.
 not yet mapped · knob speed 100–400 mm/s · joystick moves the goal before the
 start. **Shell** (typed words or `$` frames, any case): `go`, `reset`,
 `level N` (6 = the custom map), `goal X Y`, `start X Y`, `map Y HEX`, `speed`,
-`inflate 0-2`, `react 0|1`, `cal 0|1`, `wheels 0|1`, `stats`, `dump`. Every
-change is answered with `$ACK,...`.
+`inflate 0-2`, `react 0|1`, `cal 0|1`, `wheels 0|1`, `stats`, `dump`,
+`quiet` / `loud` (stop / restart `$NAV`). Every change is answered with
+`$ACK,...`.
 
 **Telemetry**, 4 Hz: `$NAV,t_ms,level,mode,est_x,est_y,est_th_mdeg,true_x,true_y,true_th_mdeg,collisions,replans,expanded,plan_us`
 (chart any field with `08_UART_And_Python_Host/host.py --chart NAV,N,...`).
 `dump` sends `$RPATH`, `$RSTEP` (3 hex digits per cell), `$RMAP,y,occ,free`,
 `$RVETO`, `$RGOAL,startx,starty,goalx,goaly,inflate`. Map rows are 32 bits,
 bit 31 = x 0; y = 0 is the bottom row.
+
+### Run it from the station
+
+```
+python tools/station/station.py        # from the repository root, Wokwi running in VS Code
+```
+
+`wokwi.toml` forwards the simulated USART2 to `rfc2217://localhost:4000`, and
+the station (`tools/station/`) connects there. The first `$NAV` picks this
+lesson's view, `l16_nav.py`: the robot's own map as large as the window - walls,
+cells seen free, vetoed cells - the planned path, start and goal, the true pose
+(green) and the estimate (blue) with heading arrows and trails, and the
+counters. The map comes from `dump`, which the view sends when it starts, when
+the level changes, and when a run ends or is reset - never mid-run, because a
+`dump` re-plans and holds the robot's lock while it sends. Type `dump` in the
+station's console for a fresh map mid-run.
+
+Click the view and the keyboard is the pad (`_lib/kbd.h`): arrows = stick (the
+goal, before the start), `a` = A, `b`/`p` = B, `s` = SEL, `1`-`5` = knob
+(speed), `?` lists them. `-` and `+` do nothing here: speed is already the
+knob's. The station sends real key-down and key-up frames, `$KEY,<key>,<1|0>`;
+it also asks for the OLED (`$MIRROR,1` every second), which `task "ui"` sends
+as `$FB` frames right after each flush - at most two a pass, and only while
+the UART's ring has room for a whole one. The shell takes both frames before
+its own parser: they are never answered, never `$NAK`ed, never echoed.
+
+Cost: 1884 B of flash and 256 B of RAM (`kbd_t`, the mirror's 32 segment
+hashes, a static 96 B frame buffer). **Not yet watched in Wokwi**: built,
+sized, and the view tested on the PC against frames made from the firmware's
+format strings, but no station has yet talked to this firmware.
 
 ## Facts checked against sources, not memory
 
@@ -157,11 +190,12 @@ at 8 s, `stats` at 55 s.
    path" to a reachable goal: now decrease-key, measured heap, overflow reported.
 7. A lost robot's estimate off the grid indexed past `cost[]`: clamped.
 8. Built at 34 932 B flash / 15 136 B RAM — did not fit. Slide 23 lists what
-   got it to 29 216 / 11 328.
+   got it to 29 216 / 11 328 (31 100 / 11 584 since the station's keys and
+   mirror).
 
 ## Status
 
-Builds with **zero warnings**: FLASH 29 216 B, RAM 11 328 B. The host test
+Builds with **zero warnings**: FLASH 31 100 B, RAM 11 584 B. The host test
 passes (25/25 arrivals, 0 collisions at defaults, "no path" correct, C and
 Python A* identical 15/15), and the firmware ran all five levels to the goal
 in Renode with 0 collisions.
@@ -179,3 +213,9 @@ someone does:
 3. **The controls**: A/B/SEL, the knob as speed (Renode could not read it),
    the joystick moving the goal before the start, and the buzzer on collision
    and arrival.
+4. **The station** (above): do held arrow keys move the goal, does the
+   mirrored OLED keep up at 10 Hz beside `$NAV`, and does `stats` show the ui
+   and shell stacks still clear of their ends with the mirror running? By
+   `-fstack-usage` the mirror's call chain (168 B under `task_ui`, then
+   `snprintf`) is shallower than the `$NAV` send it already makes (256 B, then
+   `vsnprintf`), but no run has measured it.

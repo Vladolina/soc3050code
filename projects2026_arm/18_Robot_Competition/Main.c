@@ -32,6 +32,16 @@
  *   $RESULT,<name>,<W>,<D>,<L>,<hash>,<max cycles>,<build>*CS
  * - the line a student submits.  host/league.c re-runs the same tournament
  * on a PC and must print the same <hash>.
+ *
+ * The station on the PC (python tools/station/station.py) draws the arena
+ * large, keeps the standings, and sends real key-down/up for every control
+ * (kbd.h: arrows = stick, a = A, b = B, s = SEL, 1-5 = speed).  While it is
+ * connected - and only then - the board also sends the OLED (mirror.h) and,
+ * during a match, both robots' poses every 80 ms:
+ *   $ARENA,<round>,<phase>,<t_ms>,<won0>,<won1>,
+ *          <x0>,<y0>,<th0>,<x1>,<y1>,<th1>,<name0>,<name1>*CS    mm, mrad
+ * Both come from the display task's copy of the snapshot: they cannot touch
+ * the simulation, and the $RESULT hash is the same with or without them.
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -44,6 +54,8 @@
 #include "oled.h"
 #include "pad.h"
 #include "beep.h"
+#include "kbd.h"
+#include "mirror.h"
 #include "referee.h"
 #include "scene.h"
 
@@ -127,6 +139,11 @@ static struct {                             /* for `stats`                    */
 } perf;
 
 static const entry_t you = { "you", student_step, "joystick" };
+
+/* The station's keys: the shell feeds them in, the sim task folds them into
+ * its pad.  kbd.c has no lock of its own, so both calls take this one. */
+static kbd_t      kbd;
+static os_mutex_t kbd_lock;
 
 /* ============================================================================
  *  The sim task: menu, match, tournament
@@ -244,6 +261,9 @@ static void task_sim(void *arg)
         os_delay_until(&last, 20);
         uint32_t now = os_ticks();
         pad_read(&pad);
+        os_mutex_lock(&kbd_lock);
+        kbd_apply(&kbd, &pad, now);      /* the station's keys, into the same pad */
+        os_mutex_unlock(&kbd_lock);
         beep_poll(now);
         speed = speed_from_knob(pad.knob);
 
@@ -333,6 +353,33 @@ static void task_sim(void *arg)
 /* ============================================================================
  *  The display task
  * ============================================================================ */
+/* For the station only - mirror_live() is 1 while it keeps asking, so a plain
+ * terminal never sees these.  Each is sent only when the TX ring has room for
+ * it: say() would otherwise wait for space while holding print_lock, and the
+ * sim task's $MATCH would wait behind this, the lowest-priority task.
+ *
+ * $ARENA: the poses in the snapshot, as integers (printf has no %f here).
+ * About 70 bytes every 80 ms - under 1 KB/s of the link's ~11. */
+#define ARENA_ROOM 100u
+static void station_send(const snap_t *s, uint32_t now)
+{
+    if (!mirror_live(now)) { return; }
+    if (s->screen == SCR_MATCH && uart_tx_room() >= ARENA_ROOM) {
+        send_frame("ARENA,%u,%u,%ld,%u,%u,%d,%d,%d,%d,%d,%d,%s,%s",
+                   s->round, s->phase, (long)s->t_ms, s->won[0], s->won[1],
+                   (int)(s->x[0] * 1000.0f), (int)(s->y[0] * 1000.0f), (int)(s->th[0] * 1000.0f),
+                   (int)(s->x[1] * 1000.0f), (int)(s->y[1] * 1000.0f), (int)(s->th[1] * 1000.0f),
+                   s->name[0], s->name[1]);
+    }
+    /* The OLED mirror: at most 2 frames a pass, so the screen is never held up. */
+    static char frame[MIRROR_FRAME_MAX];
+    for (int i = 0; i < 2 && uart_tx_room() >= MIRROR_FRAME_MAX; i++) {
+        size_t n = mirror_next(frame, sizeof frame, now);
+        if (n == 0) { break; }
+        say("%s", frame);
+    }
+}
+
 static void task_oled(void *arg)
 {
     (void)arg;
@@ -343,6 +390,7 @@ static void task_oled(void *arg)
         __disable_irq(); s = snap; __enable_irq();
         scene_draw(&s);
         oled_flush();
+        station_send(&s, os_ticks());
     }
 }
 
@@ -388,10 +436,32 @@ static int number(const char *p, uint32_t *v)
     return 1;
 }
 
+static void print_keys(void)
+{
+    say("keys: arrows = stick, a = A, b = B, s = SEL, 1-5 = speed x1 x2 x4 x8 MAX, ? = this\n");
+}
+
+/* A $ line is the station's, never a command: $KEY goes to kbd.c, $MIRROR to
+ * mirror.c, and neither may answer - the station would see its own keys
+ * echoed between telemetry frames.  Only ? (KBD_HELP) prints.  - and + are
+ * ignored: 1-5 already pick every speed there is. */
+static void station_line(const char *line)
+{
+    uint32_t now = os_ticks();
+    if (kbd_is_key(line)) {
+        os_mutex_lock(&kbd_lock);
+        int cmd = kbd_frame(&kbd, line, now);
+        os_mutex_unlock(&kbd_lock);
+        if (cmd == KBD_HELP) { print_keys(); }
+    } else {
+        (void)mirror_frame(line, now);     /* anything else: silently dropped */
+    }
+}
+
 static void task_shell(void *arg)
 {
     (void)arg;
-    char line[32];
+    char line[32];                         /* >= KBD_LINE_MAX: a $KEY line fits */
     size_t n = 0;
     for (;;) {
         char c = (char)uart_getc();
@@ -402,7 +472,8 @@ static void task_shell(void *arg)
         line[n] = 0;
         n = 0;
         uint32_t v;
-        if (!strcmp(line, "stats"))      { cmd_stats(); }
+        if (line[0] == '$')              { station_line(line); }
+        else if (!strcmp(line, "stats")) { cmd_stats(); }
         else if (!strcmp(line, "tour"))  { req_tour = 1; }
         else if (!strncmp(line, "tour ", 5) && number(line + 5, &v)) { base_seed = v; req_tour = 1; }
         else if (!strncmp(line, "seed ", 5) && number(line + 5, &v)) {
@@ -427,6 +498,8 @@ int main(void)
     if (pad_init() != 0) { say("pad: ADC did not start - joystick and knob read 0\n"); }
     beep_init();
     say("A start  B next opponent  SEL driver/cones  knob speed.  Serial: tour [seed], seed N, stats\n");
+    say("station: python tools/station/station.py - arena, standings, OLED; keys a b s 1-5, arrows\n");
+    kbd_init(&kbd);
 
     os_task_create("sim",   task_sim,   0, stk_sim,   512, 3);
     os_task_create("shell", task_shell, 0, stk_shell, 384, 2);

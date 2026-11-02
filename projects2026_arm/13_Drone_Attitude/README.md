@@ -32,27 +32,62 @@ and Slide 22 measures what it costs.
 | `control.h` | **the contract**: `sensors_t`, `actuators_t`, `control_step()`, tuning struct, failsafe codes, frames and signs |
 | `control.c` | **subject — the student's file.** Complementary filter, angle and rate loops, D on measurement, anti-windup, X mixer, saturation, arming and failsafes. Pure C |
 | `world.h`, `world.c` | **subject — the plant.** Euler's equations, quaternion kinematics, motor lag and saturation, drag torque; IMU with bias walk, noise, vibration (integer phase + sine table), DLPF. Pure C |
-| `Main.c` | five RTOS tasks (world, ctrl, pilot, shell, disp), SysTick cycle counting, MPU6050 driver and axis mapping, artificial horizon, `$ATT`/`$EST` telemetry, shell `stats alpha aw mix kick hold` |
+| `Main.c` | five RTOS tasks (world, ctrl, pilot, shell, disp), SysTick cycle counting, MPU6050 driver and axis mapping, artificial horizon, `$ATT`/`$EST` telemetry, shell `stats alpha aw mix kick hold quiet loud`, the station's keys (`$KEY`) and OLED mirror (`$FB`) |
 | `host/sitl.c` | the SITL test: 24 checks; `sitl score ANGLE_KP RATE_KP [KI [KD [ALPHA]]]` for the Lab Part 1 contest |
 | `host/run.bat`, `host/run.sh` | build and run it with the PC's `gcc` |
 | `host/cycles.py` | the cycle budget: runs this `Main.elf`'s `world_step`, `world_sense` and `control_step` on lesson 10's Cortex-M0+ model (`10_Fixed_Point_And_DMA/host/m0sim.py`) |
-| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep` |
-| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board plus `wokwi-mpu6050` on PB8/PB9 at 0x68 |
+| `build.bat` | `LIBS=retarget os uart proto i2c oled adc pad beep keys kbd mirror` |
+| `_lib/kbd.h`, `_lib/kbd.c`, `_lib/keys.c` | (shared) the station's `$KEY` down/up frames, written into the same `pad_t` the pins fill |
+| `_lib/mirror.h`, `_lib/mirror.c` | (shared) the OLED, copied to the station as `$FB` frames while it asks |
+| `simulate.bat`, `diagram.json`, `wokwi.toml` | the app board plus `wokwi-mpu6050` on PB8/PB9 at 0x68; `wokwi.toml` also forwards the serial port to the station (`rfc2217ServerPort = 4000`) |
 
 ## Build and run
 
 ```
-build.bat          # FLASH 26292 B / 32 KB, RAM 10848 B / 12 KB, zero warnings
+build.bat          # FLASH 28524 B / 32 KB, RAM 11120 B / 12 KB, zero warnings
 host\run.bat       # PASSED: 0 of 24 checks failed
 python host\cycles.py         # needs Main.elf; about 35 s
 simulate.bat
 python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
 ```
 
-RAM is 88 % used: five task stacks (256–384 words) are 6.4 KB of it, the
-OLED framebuffer 1 KB. `stats` prints each stack's high-water mark; nobody
+RAM is 90 % used: five task stacks (256–384 words) are 6.4 KB of it, the
+OLED framebuffer 1 KB, the station's key state and mirror under 0.3 KB. `stats` prints each stack's high-water mark; nobody
 has read those numbers yet, so the stack sizes are lesson 09's experience,
 not a measurement.
+
+## Run it from the station
+
+The OLED is 128 × 64 pixels in a simulator window. The ground station draws
+it large and gives every control a key:
+
+```
+python tools/station/station.py        # from the repository root
+```
+
+Start the simulation from the **Wokwi VS Code extension** (it reads
+`wokwi.toml`, whose `rfc2217ServerPort = 4000` forwards USART2 to the
+station; the browser route cannot). The first `$ATT` frame selects the
+station's lesson 13 view, `tools/station/views/l13_attitude.py`: a full-window
+artificial horizon — the estimate filled, the truth dashed, the setpoint
+dotted (in MPU mode, the accelerometer-only tilt dashed) — the four motors,
+and strip charts of roll, pitch and estimate − truth.
+
+| Key | Does | | Key | Does |
+|---|---|---|---|---|
+| arrows | the joystick (roll / pitch setpoint) | | `s` | SEL: SIM ↔ MPU |
+| `a` | A: arm / disarm | | `1`–`5` | the knob: Kp ×0.19, ×0.44, ×1, ×2.3, ×5.3 |
+| `b` or `p` | B: gust | | `?` | print this list |
+
+`-` and `+` do nothing here (the digits already step the gain). The shell
+still works from the station's command line; `quiet` stops the 25 Hz
+`$ATT`/`$EST` frames and `loud` starts them again. Text lines (`mode:`,
+`failsafe:`, `CRASH`) are never silenced. The station's `$KEY` and `$MIRROR`
+lines are routed before the shell's own parser and are never answered.
+
+**Not yet watched in Wokwi.** The code builds and the view was exercised on
+the PC with frames in the firmware's format; nobody has yet seen the station
+drive this lesson.
 
 ## Facts checked against sources, not memory
 
@@ -128,11 +163,12 @@ now taught:**
 
 ## Status
 
-Builds with **zero warnings** (FLASH 26 292 B, RAM 10 848 B). `host/run.bat`
+Builds with **zero warnings** (FLASH 28 524 B, RAM 11 120 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
 **Not yet watched running in Wokwi.** Nothing on the OLED, no button, no
-slider and no `stats` output has been seen. When someone does, look first at:
+slider and no `stats` output has been seen, and neither has the station
+route (keys, `quiet`/`loud`, the OLED mirror, the attitude view). When someone does, look first at:
 
 1. **The loop rate on the OLED and `stats`.** It must say 250 Hz with no
    late wake-ups in SIM mode. If the world and controller do not fit the CPU

@@ -40,8 +40,8 @@ simulate.bat
 Zero warnings:
 
 ```
-           FLASH:       23960 B        32 KB     73.12%
-             RAM:       10144 B        12 KB     82.55%
+           FLASH:       26280 B        32 KB     80.20%
+             RAM:       10408 B        12 KB     84.70%
 ```
 
 Paste `diagram.json` (the app board: OLED, joystick, A, B, knob, buzzer) and
@@ -79,6 +79,15 @@ host\run.bat          (or:  bash host/run.sh)
 ```
 
 It ends `all checks passed` and exits 0.
+
+**Run it from the station (optional).** With the simulation running in VS
+Code, `python tools/station/station.py` from the repository root draws the
+robot large: the body at the true tilt, the controller's estimate as a dashed
+ghost, and charts of both tilts, the motor volts and the position. Its keys
+are held as long as you hold them - arrows drive, `a` stand up, `b` push, `s`
+next controller, `1`-`5` payload, `-`/`+` a smaller/bigger push, `?` the list.
+Type `quiet` to stop `$BAL`, `loud` to restart it. *Not yet watched in Wokwi:*
+if nothing appears, say so, and use the OLED and `host.py` as below.
 
 ---
 

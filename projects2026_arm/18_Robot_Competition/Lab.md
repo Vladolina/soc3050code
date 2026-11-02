@@ -47,8 +47,8 @@ simulate.bat
 Zero warnings, and about:
 
 ```
-           FLASH:       27124 B        32 KB     82.78%
-             RAM:        9608 B        12 KB     78.19%
+           FLASH:       29244 B        32 KB     89.25%
+             RAM:        9872 B        12 KB     80.34%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board: OLED,
@@ -77,6 +77,24 @@ starter finish?
 > matches — above only Coward. Note the `s-out` column: **27** rounds lost by
 > driving out with nobody touching. Every check prints `[PASS]` and the script
 > ends with `ALL CHECKS PASSED` and identical hashes at -O0, -O2 and -Os.
+
+### Step 4. Run it from the station (optional)
+
+With the simulation running in VS Code, start
+
+```
+python tools\station\station.py
+```
+
+from the repository root and click its picture. The dohyo appears large —
+both robots with their headings and names, the round score and the clock —
+with the standings beside it, kept from every `$MATCH` and `$RESULT`. The
+board's controls are keys: **a** = A, **b** = B, **s** = SEL, **1**–**5** =
+speed x1…MAX, arrows = the stick in fun mode, **?** = the list. Run a
+tournament with the station connected: its `$RESULT` hash must be the one you
+got without it — the station only watches. Not yet tried against Wokwi: if
+the station keeps saying *waiting for rfc2217://localhost:4000*, write that
+down and use the board's buttons.
 
 ---
 

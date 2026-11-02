@@ -12,7 +12,8 @@
  *
  *   time     SysTick at 1 kHz, and a microsecond stopwatch read from it
  *   the loop "update at a fixed rate, render when time allows"
- *   output   sound effects on the buzzer, $SCORE and $PERF frames on serial
+ *   output   sound effects on the buzzer, $SCORE and $PERF frames on serial,
+ *            and the screen itself for the station on the PC (mirror.h)
  *
  * One loop, no RTOS - slide 18 says why.  So this lesson defines its own
  * SysTick_Handler, and does not link `os`, which would want SysTick too.
@@ -26,6 +27,10 @@
  * a = A,  b or p = B,  s = SEL,  1-5 = knob,  ? = list them,  and the words
  * "quiet" / "loud" + Enter stop and restart $PERF.  So the OLED can be zoomed
  * to fill the window and the game played without seeing the board.
+ *
+ * Better still, the station: python tools/station/station.py draws the OLED
+ * large on the PC (this file sends it as $FB frames when asked) and sends
+ * real key-down and key-up ($KEY frames), so a held key is simply held.
  *
  * Build:    build.bat
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf.
@@ -42,6 +47,7 @@
 #include "engine.h"
 #include "arcade.h"
 #include "kbd.h"
+#include "mirror.h"
 
 #define BAUD         115200u
 #define MAX_CATCHUP  4               /* at most 4 updates per frame         */
@@ -157,16 +163,27 @@ static void send_frame(const char *fmt, ...)
 }
 
 /* ============================================================================
- *  Keyboard: bytes from the terminal, caught by an interrupt
+ *  Serial, both ways by interrupt: keys in, text and the OLED mirror out
  * ============================================================================
- * The UART holds ONE received byte.  An arrow is three (ESC [ A) arriving
+ * IN.  The UART holds ONE received byte.  An arrow is three (ESC [ A) arriving
  * 87 us apart, and the loop looks once a millisecond - polling would keep the
  * last byte and lose the ESC.  So the RXNE interrupt moves each byte into a
- * ring at once, and the loop drains the ring at its leisure (lesson 08). */
-#define RX_SIZE 32u                          /* a power of two: index & (size-1) */
+ * ring at once, and the loop drains the ring at its leisure (lesson 08).
+ *
+ * OUT.  retarget.c's printf waits for every byte, 87 us each: a $PERF line
+ * stalled the loop ~4 ms, and the OLED mirror (mirror.h) - 78 bytes a frame,
+ * several a second - would stall it far more.  So this lesson replaces
+ * retarget's weak _write() with a ring that the TXE interrupt drains, as
+ * lesson 08 does.  printf now returns at once; only a FULL ring makes it wait,
+ * and the mirror never fills it: it sends only when tx_room() says there is
+ * space. */
+#define RX_SIZE 32u                          /* powers of two: index & (size-1)  */
+#define TX_SIZE 512u
 
 static volatile uint8_t  rx_buf[RX_SIZE];
 static volatile uint32_t rx_head, rx_tail;   /* ISR writes head, loop writes tail */
+static volatile uint8_t  tx_buf[TX_SIZE];
+static volatile uint32_t tx_head, tx_tail;   /* loop writes head, ISR writes tail */
 
 void USART2_IRQHandler(void)
 {
@@ -176,13 +193,54 @@ void USART2_IRQHandler(void)
         uint8_t c = (uint8_t)USART2->RDR;                /* reading RDR clears RXNE */
         if (rx_head - rx_tail < RX_SIZE) { rx_buf[rx_head & (RX_SIZE - 1u)] = c; rx_head++; }
     }
+    if ((USART2->CR1 & USART_CR1_TXEIE_TXFNFIE) && (isr & USART_ISR_TXE_TXFNF)) {
+        if (tx_tail != tx_head) { USART2->TDR = tx_buf[tx_tail & (TX_SIZE - 1u)]; tx_tail++; }
+        else { USART2->CR1 &= ~USART_CR1_TXEIE_TXFNFIE; }   /* idle: else TXE fires forever */
+    }
 }
 
-static void keyboard_init(void)
+static uint32_t tx_room(void) { return TX_SIZE - (tx_head - tx_tail); }
+
+static void tx_put(uint8_t c)
+{
+    while (tx_room() == 0u) { }                  /* full: the interrupt drains it */
+    tx_buf[tx_head & (TX_SIZE - 1u)] = c;        /* the byte first, then the index */
+    tx_head++;
+}
+
+int _write(int fd, const char *buf, int len)     /* replaces retarget.c's, at link time */
+{
+    (void)fd;
+    for (int i = 0; i < len; i++) {
+        if (buf[i] == '\n') { tx_put('\r'); }
+        tx_put((uint8_t)buf[i]);
+    }
+    __disable_irq();                             /* the ISR also writes CR1 */
+    USART2->CR1 |= USART_CR1_TXEIE_TXFNFIE;
+    __enable_irq();
+    return len;
+}
+
+/* Right after uart2_init(), before the first printf: from here on _write()
+ * relies on the interrupt to empty its ring. */
+static void serial_init(void)
 {
     USART2->CR1 |= USART_CR1_RXNEIE_RXFNEIE;    /* retarget.c turned RE on already */
     NVIC_SetPriority(USART2_IRQn, 1);
     NVIC_EnableIRQ(USART2_IRQn);
+}
+
+/* The OLED mirror: after each flush, as many $FB frames as fit, at most 2 a
+ * pass so the loop is never held up.  The station asks for them; a terminal
+ * never sees one. */
+static void mirror_poll(void)
+{
+    char frame[MIRROR_FRAME_MAX];
+    for (int i = 0; i < 2 && tx_room() >= MIRROR_FRAME_MAX; i++) {
+        size_t n = mirror_next(frame, sizeof frame, ms);
+        if (n == 0) { break; }
+        _write(1, frame, (int)n);
+    }
 }
 
 static void print_keys(void)
@@ -210,6 +268,7 @@ static void keyboard_poll(kbd_t *k, int *perf_on, int *pace)
                    (unsigned)pace_pct[*pace], (unsigned)pace_ms(*pace));
             break;
         case KBD_UNKNOWN: printf("? '%s' - words are quiet, loud; ? lists the keys\n", kbd_word(k)); break;
+        case KBD_FRAME:   mirror_frame(kbd_line(k), ms);                                    break;
         default: break;
         }
     }
@@ -221,6 +280,7 @@ static void keyboard_poll(kbd_t *k, int *perf_on, int *pace)
 int main(void)
 {
     uart2_init(SystemCoreClock, BAUD);
+    serial_init();
     SysTick_Config(SystemCoreClock / 1000u);       /* 1 ms tick, interrupt on */
 
     printf("\n=== SOC3050 lesson 12 - Game ===\n");
@@ -236,7 +296,7 @@ int main(void)
     printf("  buzzer   : PA6, TIM3_CH1\n");
     printf("  frames   : $SCORE,game,score  per game;  $PERF,fps,ups,flush_us,max_us,bytes,busy%%,mode  per second\n");
     printf("  stick press toggles the profiler mode: dirty pages / full repaint\n");
-    keyboard_init();
+    printf("  station  : python tools/station/station.py - the OLED large, keys up and down\n");
     print_keys();
     printf("  pace     : %u %% - one %u ms game tick every %u ms; - and + change it\n",
            (unsigned)pace_pct[PACE_START], (unsigned)TICK_MS, (unsigned)pace_ms(PACE_START));
@@ -295,6 +355,7 @@ int main(void)
         flush_sum += t2 - t1;
         if (t2 - t1 > flush_max) { flush_max = t2 - t1; }
         busy_us += t2 - t0;
+        mirror_poll();                /* the station's copy of the screen */
 
         /* ---- once a second: the profile ---------------------------------- */
         uint32_t el = ms - sec_start;

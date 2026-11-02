@@ -29,7 +29,7 @@ once they had a second user. `08_UART_And_Python_Host/host.py` gained
 ## Build and run
 
 ```
-build.bat        # FLASH 11108 B / 32 KB, RAM 7536 B / 12 KB, zero warnings
+build.bat        # FLASH 11152 B / 32 KB, RAM 7536 B / 12 KB, zero warnings
 simulate.bat
 python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart IMU,2,-16384,16384
 ```

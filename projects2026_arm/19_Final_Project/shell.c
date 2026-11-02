@@ -11,6 +11,18 @@
  *   hang <task>       make a task block forever - a deadlock, simulated
  *   spin <task>       make a task loop forever  - a runaway, simulated
  *   reset             NVIC_SystemReset()
+ *   quiet / loud      stop / restart the periodic $APP and $SYS frames, so a
+ *                     person at a terminal can read the shell's answers
+ *
+ * Lines that start with '$' are not commands but FRAMES from the station
+ * (tools/station/station.py), and are answered with silence:
+ *
+ *   $KEY,<key>,<1|0>*CS   a key went down or up -> kbd_frame() (kbd.h)
+ *   $MIRROR,<1|0>*CS      "keep sending the OLED" -> mirror_frame() (mirror.h)
+ *
+ * The station sends a $KEY for every key press and release and a $MIRROR
+ * every second: one word of reply to each would bury the console.  The only
+ * key that prints is '?', which asks for the key list.
  *
  * The CPU column is the kernel's own accounting (os.h: `ticks` counts the
  * 1 ms ticks during which each task was the one running).  It is a SAMPLE:
@@ -26,6 +38,8 @@
 #include "i2c.h"
 #include "oled.h"
 #include "wdog.h"
+#include "kbd.h"
+#include "mirror.h"
 #include "sys.h"
 
 static uint32_t prev_ticks[OS_MAX_TASKS], prev_now;
@@ -111,10 +125,33 @@ static int inject(volatile uint32_t *mask, const char *name, const char *what)
     return 0;
 }
 
+void print_keys(void) { say("%s", KEYS_HELP); }
+
+/* A line from the station.  Returns 1 if it was one of its frames - handled,
+ * and never answered - or 0 to let the command parser see it as before. */
+static int station_frame(const char *line)
+{
+    if (kbd_is_key(line)) {
+        os_mutex_lock(&kbd_lock);            /* input's kbd_apply() reads kbd */
+        int cmd = kbd_frame(&kbd, line, os_ticks());
+        os_mutex_unlock(&kbd_lock);          /* print, if at all, unlocked    */
+        if (cmd == KBD_HELP) { print_keys(); }
+        /* KBD_SLOWER / KBD_FASTER ('-' and '+') mean nothing in this template
+         * and are dropped without a word - steer has no pace to change.  Give
+         * them a meaning in your project here (lesson 12: the game's speed).
+         * A $KEY with a bad checksum comes back KBD_NONE: also silence. */
+        return 1;
+    }
+    os_mutex_lock(&mirror_lock);             /* display's mirror_next() too   */
+    int m = mirror_frame(line, os_ticks());
+    os_mutex_unlock(&mirror_lock);
+    return m;
+}
+
 void task_shell(void *arg)
 {
     (void)arg;
-    char line[32];
+    char line[32];        /* >= KBD_LINE_MAX (24): the longest $KEY line fits */
     uint32_t n = 0;
     for (;;) {
         char c = (char)uart_getc();                  /* blocks: no CPU used */
@@ -122,17 +159,20 @@ void task_shell(void *arg)
         if (n == 0) { continue; }
         line[n] = '\0';
         n = 0;
+        if (line[0] == '$' && station_frame(line)) { continue; }
         if      (strcmp(line, "stats")  == 0) { cmd_stats(); }
         else if (strcmp(line, "health") == 0) { cmd_health(); }
         else if (strcmp(line, "scan")   == 0) { cmd_scan(); }
         else if (strncmp(line, "hang ", 5) == 0) { inject(&fault_hang, line + 5, "hang"); }
         else if (strncmp(line, "spin ", 5) == 0) { inject(&fault_spin, line + 5, "spin"); }
+        else if (strcmp(line, "quiet")  == 0) { tel_quiet = 1; say("quiet: no $APP/$SYS - type loud to resume\n"); }
+        else if (strcmp(line, "loud")   == 0) { tel_quiet = 0; say("loud: $APP and $SYS on\n"); }
         else if (strcmp(line, "reset")  == 0) {
             say("reset\n");
             os_delay(20);
             NVIC_SystemReset();
         } else {
-            say("commands: stats  health  scan  hang <task>  spin <task>  reset\n");
+            say("commands: stats  health  scan  hang <task>  spin <task>  reset  quiet  loud\n");
         }
     }
 }

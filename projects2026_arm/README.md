@@ -372,14 +372,19 @@ every host test passes:
 |---|---|---|
 | 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
 | 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
-| 12 | 17 608 / 4 288 | 32/32; each game played by script, and by terminal keys; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
-| 13 | 26 292 / 10 848 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
-| 14 | 27 496 / 10 520 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
-| 15 | 26 988 / 9 352 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
-| 16 | 29 216 / 11 328 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
-| 17 | 23 960 / 10 144 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
-| 18 | 27 124 / 9 608 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
-| 19 | 16 648 / 10 280 | 15/15; the template's health and watchdog logic |
+| 12 | 19 272 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
+| 13 | 28 524 / 11 120 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
+| 14 | 29 600 / 10 776 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
+| 15 | 29 484 / 9 744 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
+| 16 | 31 100 / 11 584 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
+| 17 | 26 280 / 10 408 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
+| 18 | 29 244 / 9 872 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
+| 19 | 18 780 / 10 552 | 15/15; the template's health and watchdog logic |
+
+FLASH / RAM for 12-19 are the 2026-11-03 builds, after the station wiring
+(`kbd`, `mirror`, `keys`): 1.9-2.5 KB more flash and 250-600 B more RAM each.
+Lesson 16 now has 1.7 KB of flash and 704 B of RAM left; lesson 18's room for
+a student's `student.c` under its 29 KB line fell from ~2 KB to ~0.4 KB.
 
 **Wokwi does not implement DMA, IWDG, PWR or RTC** on this board, and WWDG is
 "implemented, not tested" ([Wokwi's board page](https://docs.wokwi.com/parts/board-st-nucleo-c031c6)).
@@ -602,6 +607,24 @@ lesson's slide 33b:
 `debounce_step()` is inlined under `-Os`, but line breakpoints inside it still
 work: `-g3` keeps the line table. Whether Wokwi's GDB server accepts writes to
 peripheral registers has not been confirmed; Lab 05 Part 8 says so.
+
+## The station: the board's screen and keyboard on the PC (2026-11-03)
+
+The app board's OLED is 128 x 64 - too small to watch in a simulator window,
+and too small for a drone or a robot. So lessons 12-19 are watched and driven
+from **`tools/station/station.py`**, a ground station in one window: the OLED
+drawn large, the lesson's telemetry drawn at the PC's resolution (an artificial
+horizon, a map, a pendulum), and a console. Its keyboard sends real key-down
+and key-up as `$KEY` frames; `_lib/kbd.c` folds them into the same `pad_t`
+the pins fill. The OLED reaches the PC as `$FB` frames from `_lib/mirror.c`,
+sent only while the station asks. **The board computes; the PC draws** - the
+serial link carries state at a few KB/s, never pixels at PC resolution.
+
+Standard library plus a vendored pyserial (`tools/pylib/`), so nothing to
+install. Each lesson's `wokwi.toml` forwards the UART as
+`rfc2217ServerPort = 4000`. `tools/station/fakeboard.py` stands in for a board.
+**Run against `fakeboard.py` only so far; never yet against Wokwi.** Details
+and the protocol: `tools/station/README.md`.
 
 ## Decisions
 
