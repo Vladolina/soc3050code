@@ -1,51 +1,34 @@
 [project]
-name = "atmega128-interface"
-version = "0.1.0"
-description = "Student-friendly Python interface for ATmega128 microcontroller"
-authors = [
-    {name = "SOC3050 Course", email = "course@university.edu"}
-]
+name = "soc3050code"
+version = "2026.11"
+description = "SOC3050 Embedded Systems - the PC side: the station, the lessons' host scripts, the build helpers"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 
+# What the current course runs.  After cloning:   uv sync
 dependencies = [
-    "pyserial>=3.5",
+    "pyserial>=3.5",      # tools/station, ARM 08 host.py, 14 host/mission.py, 16 host/planner.py
+    "matplotlib>=3.8",    # ARM 08 host.py --chart
+    "capstone>=5.0",      # projects2026_arm/_build/disasm.py
+]
+
+[dependency-groups]
+# The station's --snapshot (screenshots for the docs).        uv sync --group docs
+docs = ["pillow>=10"]
+# The previous edition's python_projects/, python_libs/ and dashboards/.
+#                                                              uv sync --group legacy
+legacy = [
     "flask>=2.3.0",
     "flask-socketio>=5.3.0",
-    "matplotlib>=3.7.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
-    "requests>=2.31.0"
+    "requests>=2.31.0",
+    "scipy>=1.10.0",
+    "intelhex>=2.3.0",
+    "jupyterlab>=3.6.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0"
-]
-
-web = [
-    "plotly>=5.15.0",
-    "dash>=2.12.0",
-    "gunicorn>=21.0.0"
-]
-
-iot = [
-    "paho-mqtt>=1.6.0",
-    "boto3>=1.28.0",
-    "azure-iot-device>=2.12.0"
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.black]
-line-length = 88
-target-version = ['py38']
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = "-v"
+[tool.uv]
+# A course, not a library: uv sync makes the environment and installs nothing
+# of its own.  uv's own Python builds include tkinter, which the station needs.
+package = false

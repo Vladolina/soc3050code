@@ -20,8 +20,8 @@ Answers marked **measured** come from running the firmware in Renode
 (lesson 07, slide 20) and feeding its output to `host.py`. Where Wokwi may
 differ, the part says so.
 
-You need Python 3 for Parts 1–2. `pyserial` only for Part 3
-(`pip install pyserial`); `matplotlib` only if you want a real plot.
+Run `uv sync` once at the repository root: it brings Python, `pyserial`
+(Part 3) and `matplotlib` (a real plot). Then `uv run host.py ...`.
 
 ---
 

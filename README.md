@@ -42,10 +42,20 @@ Nothing else needs installing to build: both compilers and SimulIDE are in
 
 - the **Wokwi** VS Code extension, which simulates them - VS Code offers it
   when you open the folder, and it asks you to activate a licence once;
-- **Python 3** for the station (**Terminal → Run Task → ARM: Station**: the
-  board's screen and keyboard on the PC) - from https://www.python.org/downloads/,
-  which includes the tkinter it needs. The task finds `py` or `python` itself
-  and says so plainly if neither works; the serial library is in `tools/pylib/`.
+- **uv**, which brings Python and every package the course's PC-side tools
+  use (the station, the lessons' host scripts). Install it once:
+  `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+  (or `winget install astral-sh.uv`), then at the repository root:
+
+  ```
+  uv sync
+  ```
+
+  `pyproject.toml`, `uv.lock` and `.python-version` pin it all: Python 3.12
+  (with the tkinter the station needs), pyserial, matplotlib, capstone.
+  Run a tool with `uv run`, e.g. `uv run tools/station/station.py`, or use
+  **Terminal → Run Task → ARM: Station**. The previous edition's Python
+  track has its own group: `uv sync --group legacy`.
 
 Then open any file under `projects2026_avr/01_Port_Basic/` and press
 **Ctrl+Shift+B** to build, or run **Terminal → Run Task → Simulate Current

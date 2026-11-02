@@ -27,8 +27,8 @@ every held key is released.  The board side is _lib/kbd.c.
 
 Wokwi: the lesson's wokwi.toml must carry  rfc2217ServerPort = 4000  (all of
 12-19 do).  Start the simulation first, or start this first - it keeps
-retrying.  Needs only Python's standard library and the pyserial copy in
-tools/pylib/.
+retrying.  Python and pyserial come from the course's uv environment: run
+uv sync once at the repository root, then  uv run tools/station/station.py.
 """
 
 import argparse
@@ -40,10 +40,13 @@ import time
 import tkinter as tk
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "pylib"))
 sys.path.insert(0, HERE)
 
-import serial  # noqa: E402  - tools/pylib/serial, pyserial 3.5
+try:
+    import serial  # pyserial, from the uv environment (pyproject.toml)
+except ImportError:
+    sys.exit("pyserial is missing: run  uv sync  at the repository root, then\n"
+             "start the station with  uv run tools/station/station.py")
 
 import views  # noqa: E402
 from views.base import BG, DIM, FG, FONT  # noqa: E402

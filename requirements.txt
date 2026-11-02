@@ -1,6 +1,7 @@
 # ATmega128 Educational Framework - Python Requirements  
-# Install with: pip install -r requirements.txt
-# For students: pip install -r requirements.txt --user
+# SUPERSEDED by pyproject.toml + uv.lock: run  uv sync  (current course),
+# or  uv sync --group legacy  for the previous edition's Python track.
+# Kept for the old scripts that still name this file.
 
 # === CORE REQUIREMENTS (Essential for all students) ===
 

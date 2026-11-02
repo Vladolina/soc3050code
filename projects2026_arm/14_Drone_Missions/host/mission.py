@@ -146,7 +146,7 @@ def open_port(url):
     try:
         import serial
     except ImportError:
-        sys.exit("pyserial is needed for --port:  pip install pyserial\n"
+        sys.exit("pyserial is needed for --port:  uv sync  at the repository root\n"
                  "(or print the frames and paste them into Wokwi's serial monitor)")
     return serial.serial_for_url(url, baudrate=115200, timeout=0.1)
 

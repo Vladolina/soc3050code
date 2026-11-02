@@ -22,12 +22,11 @@ ground station:
 2 KB/s), far too little for pixels at PC resolution (one 640 × 480 frame would
 take over 3 s). So the board sends state, and the view turns it into a picture.
 
-**Needs:** Python 3 with tkinter (https://www.python.org/downloads/ includes
-it). Nothing else - pyserial is in `tools/pylib/`. The VS Code task **ARM:
-Station** runs `tools/cli/station.ps1`, which tries `py -3`, `python` and
-`python3` in turn, uses the first that really runs with tkinter (the
-Microsoft Store's `python` placeholder does not), and prints how to install
-Python if none does.
+**Needs:** the course's uv environment - `uv sync` at the repository root
+(`pyproject.toml`: Python 3.12 with tkinter, pyserial). Then
+`uv run tools/station/station.py`, or the VS Code task **ARM: Station**, which
+runs `tools/cli/station.ps1`: it uses `uv run` (which syncs first if needed)
+and prints how to install uv if it is missing.
 
 ## The keyboard
 

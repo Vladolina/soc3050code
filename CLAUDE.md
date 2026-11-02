@@ -768,20 +768,29 @@ Target files are `.bat` now, and the engine refuses to build if `MCUFLAGS` or
 section 5 and belongs beside it: **a silent no-op that produces a plausible
 error somewhere else.**
 
-## 9i. The station and tools/pylib (2026-11-03)
+## 9i. The station and the uv environment (2026-11-03)
 
 Recorded here because it adds to `tools/`, which both editions share; the
 ARM side of it is in `projects2026_arm/README.md` and `tools/station/README.md`.
 
-- `tools/station/station.py` - the ARM edition's ground station. Standard
-  library (tkinter) plus `tools/pylib/serial` (pyserial 3.5, from the PyPI
-  wheel, SHA-256 recorded in `tools/pylib/README.md`). VS Code task
-  **ARM: Station**. `views/` holds one module per lesson, auto-discovered;
+- `tools/station/station.py` - the ARM edition's ground station (tkinter +
+  pyserial). VS Code task **ARM: Station** runs `tools/cli/station.ps1`,
+  which uses `uv run`. `views/` holds one module per lesson, auto-discovered;
   `fakeboard.py` is a pretend board on TCP for testing without a simulator.
 - The design rule: **the board computes, the PC draws.** 115 200 baud is
   ~11 KB/s - enough for state frames, never for PC-resolution pixels.
-- `python` on PATH here is a repo-local `.venv` **without pip**; `py -3` is
-  the system 3.13 with pip and Pillow. The station's `--snapshot` (docs
+- **Python is a uv project at the root** (2026-11-03, the maintainer's
+  choice, as in their other course): `pyproject.toml` (no package,
+  `[tool.uv] package = false`), `uv.lock`, `.python-version` = 3.12.
+  Students run `uv sync` once; uv fetches its own Python, which includes
+  tkinter. Dependencies are only what the current course runs - pyserial,
+  matplotlib, capstone; groups `docs` (pillow) and `legacy` (the previous
+  edition's flask/pandas/jupyter set). The old 2025 `pyproject.toml` was a
+  hatchling package that `uv sync` could not build; `requirements.txt` stays
+  only for legacy scripts. A vendored pyserial (`tools/pylib/`) existed for
+  a few hours and was removed in favour of uv - one source, not two.
+- The root `.venv` is uv's; `python` on PATH here is that venv. `py -3` is
+  the system 3.13 with Pillow. The station's `--snapshot` (docs
   screenshots) needs Pillow, and grabs a screen region - it captures whatever
   window is on top, so do not take snapshots while someone is using the PC.
 - A new member for section 11's list, met twice in one day: **Python's text

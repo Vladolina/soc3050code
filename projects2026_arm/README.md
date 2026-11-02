@@ -501,10 +501,10 @@ nobody with a fresh clone can reproduce it. `_build/disasm.py` closes that gap
 by reading the ELF itself:
 
 ```
-pip install capstone
-python _build/disasm.py _spike/c031c6/Main.elf -f _write
-python _build/disasm.py _spike/c031c6/Main.elf            # the whole image
-python _build/disasm.py _spike/c031c6/Main.hex            # no symbols - see below
+uv sync                                                    # once: capstone comes with it
+uv run _build/disasm.py _spike/c031c6/Main.elf -f _write
+uv run _build/disasm.py _spike/c031c6/Main.elf            # the whole image
+uv run _build/disasm.py _spike/c031c6/Main.hex            # no symbols - see below
 ```
 
 capstone is a 3 MB wheel rather than a 335 MB toolchain download. The script
@@ -620,8 +620,8 @@ the pins fill. The OLED reaches the PC as `$FB` frames from `_lib/mirror.c`,
 sent only while the station asks. **The board computes; the PC draws** - the
 serial link carries state at a few KB/s, never pixels at PC resolution.
 
-Standard library plus a vendored pyserial (`tools/pylib/`), so nothing to
-install. Each lesson's `wokwi.toml` forwards the UART as
+Python and pyserial come from the course's uv environment (`uv sync` at the
+root). Each lesson's `wokwi.toml` forwards the UART as
 `rfc2217ServerPort = 4000`. `tools/station/fakeboard.py` stands in for a board.
 **Run against `fakeboard.py` only so far; never yet against Wokwi.** Details
 and the protocol: `tools/station/README.md`.
