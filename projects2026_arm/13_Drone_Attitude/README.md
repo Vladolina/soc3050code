@@ -46,9 +46,9 @@ and Slide 22 measures what it costs.
 ```
 build.bat          # FLASH 28524 B / 32 KB, RAM 11120 B / 12 KB, zero warnings
 host\run.bat       # PASSED: 0 of 24 checks failed
-python host\cycles.py         # needs Main.elf; about 35 s
+uv run host\cycles.py         # needs Main.elf; about 35 s
 simulate.bat
-python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
+uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
 ```
 
 RAM is 90 % used: five task stacks (256–384 words) are 6.4 KB of it, the
@@ -62,7 +62,7 @@ The OLED is 128 × 64 pixels in a simulator window. The ground station draws
 it large and gives every control a key:
 
 ```
-python tools/station/station.py        # from the repository root
+uv run tools/station/station.py        # from the repository root
 ```
 
 Start the simulation from the **Wokwi VS Code extension** (it reads

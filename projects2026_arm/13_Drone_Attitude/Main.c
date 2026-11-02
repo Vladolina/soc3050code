@@ -18,7 +18,7 @@
  *             A         arm / disarm         B   gust: kick the drone
  *             SEL       SIM <-> MPU mode     knob  rate-loop Kp, x0.125 .. x8
  *
- * The station on the PC (python tools/station/station.py) has a key for every
+ * The station on the PC (uv run tools/station/station.py) has a key for every
  * control - arrows = joystick, a = A, b or p = B, s = SEL, 1..5 = knob, ? = the
  * list - and draws the OLED large, copied by mirror.h.  kbd.h folds its keys
  * into the same pad_t the pins fill, so task "pilot" cannot tell them apart.
@@ -570,7 +570,7 @@ int main(void)
     control_init();
     printf("  world    : 500 Hz quad on a gimbal; control 250 Hz\n");
     printf("  A arm, B gust, SEL sim/mpu, knob Kp.  Shell: stats alpha aw mix kick hold quiet loud\n");
-    printf("  station  : python tools/station/station.py - arrows stick, a arm, b gust,\n"
+    printf("  station  : uv run tools/station/station.py - arrows stick, a arm, b gust,\n"
            "             s SIM/MPU, 1-5 Kp, ? keys; the OLED drawn large\n\n");
     kbd_init(&kbd);
 

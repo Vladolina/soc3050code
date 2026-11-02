@@ -25,7 +25,7 @@ Three places to run everything:
 - **The host** — the same `world.c`, `nav.c`, `astar.c` compiled for your PC,
   every level in a second: `host\run.bat` (or `bash host/run.sh`).
 - **The station** (optional) — Wokwi in VS Code plus
-  `python tools/station/station.py`: the robot's map drawn as large as your
+  `uv run tools/station/station.py`: the robot's map drawn as large as your
   window, and your keyboard as the pad. See the end of Part 0.
 
 Predictions marked *host* were measured by `host\run.bat`. Predictions about
@@ -84,7 +84,7 @@ Start the simulation from VS Code (it reads `wokwi.toml`, which forwards the
 serial port to `rfc2217://localhost:4000`), then from the repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 The first `$NAV` frame picks this lesson's view: the robot's own map, its plan,
@@ -174,7 +174,7 @@ With no keep-away cost the plan hugs every wall. Will the robot crash?
 
 > **What you see and why.** Barely, *with the brake on*: *host* says
 > 0.04 collisions per run at `inflate 0` vs 0.00 at 1 — the reactive layer
-> catches what the planner risks. Now try `python host\planner.py --level 4
+> catches what the planner risks. Now try `uv run host\planner.py --level 4
 > --inflate 0` and `--inflate 1`: the same path, but cost 532 vs 1100 —
 > every cell of a 2-wide corridor touches a wall, so inflation cannot choose
 > a "middle" that does not exist. The margin only matters when the brake is
@@ -215,8 +215,8 @@ The planner still knows where the walls are. How many collisions per run?
 `capture.txt` when it arrives, then:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart NAV,11,0,30
-python host\planner.py --file capture.txt
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart NAV,11,0,30
+uv run host\planner.py --file capture.txt
 ```
 
 ### Guess first
@@ -238,14 +238,14 @@ robot find out it is shut?
 
 ### Do this
 
-1. `python host\planner.py --level 3` — the same A*, in Python, with the
+1. `uv run host\planner.py --level 3` — the same A*, in Python, with the
    path drawn.
 2. Make a map: copy the level-3 picture into `mine.txt` (14 lines of 32
    characters, `#` wall, `.` floor, one `S`, one `G`), change it, then
-   `python host\planner.py --map mine.txt --frames`.
+   `uv run host\planner.py --map mine.txt --frames`.
 3. Paste the frames into the serial monitor one at a time. Press A.
 4. While it drives, type `dump`, copy everything into `capture.txt`, and run
-   `python host\planner.py --file capture.txt`.
+   `uv run host\planner.py --file capture.txt`.
 
 ### Guess first
 

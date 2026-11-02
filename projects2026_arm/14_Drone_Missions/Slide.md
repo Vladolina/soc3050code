@@ -904,10 +904,10 @@ vehicle. A frame with a valid checksum is only *undamaged* — not *sensible*.
 ## Slide 22: `mission.py` — Plan, Send, Score
 
 ```
-python host\mission.py host\default.mission             frames to paste into Wokwi
-python host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
-python host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
-python host\mission.py --score capture.txt --race        score any captured flight
+uv run host\mission.py host\default.mission             frames to paste into Wokwi
+uv run host\mission.py --gen lawnmower 40 30 4 8         a survey pattern, as a file
+uv run host\mission.py my.mission --port rfc2217://localhost:4000 --log flight.log
+uv run host\mission.py --score capture.txt --race        score any captured flight
 ```
 
 Scoring reads only telemetry, so it works on a Wokwi capture, a live log or
@@ -1490,7 +1490,7 @@ with a heading tick. Panel: mode, progress (or the failsafe, prefixed `!`),
 altitude, battery and its bar, wind, time since arming; the altitude bar's
 full scale is the 30 m ceiling.
 
-**On the PC, larger:** `python tools/station/station.py` mirrors this screen
+**On the PC, larger:** `uv run tools/station/station.py` mirrors this screen
 (`$FB`, sent only while the station asks) and draws `$POS` against `$TRU`
 as a full-window map; every control is a key (`- +` = cruise speed), and
 `quiet` / `loud` stop and restart the 5 Hz frames. A fourth lock,

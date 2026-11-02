@@ -2,8 +2,8 @@
 """
 fakeboard.py - a pretend board, for trying the station without a simulator.
 
-    python tools/station/fakeboard.py            listens on localhost:4001
-    python tools/station/station.py --port socket://localhost:4001
+    uv run tools/station/fakeboard.py            listens on localhost:4001
+    uv run tools/station/station.py --port socket://localhost:4001
 
 It speaks the board's side of the station protocol: answers $MIRROR,1 with
 $FB frames of a little scene, sends $PERF each second, and moves a ball with

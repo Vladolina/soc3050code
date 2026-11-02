@@ -25,7 +25,7 @@
  *           joystick drives in manual mode
  *
  * The same controls from the station on the PC (kbd.h), which also draws the
- * OLED large and the race from above: python tools/station/station.py
+ * OLED large and the race from above: uv run tools/station/station.py
  *   arrows = stick, a = A, b or p = B, s = SEL, 1-5 = knob, - + = knob -/+ 50
  *
  * Build:     build.bat
@@ -514,7 +514,7 @@ int main(void)
     printf("  world    : %u Hz physics, %u Hz control, %d sensors at %d mm\n",
            WORLD_HZ, CONTROL_HZ, LINE_SENSORS, SENSOR_PITCH_MM);
     printf("  shell    : kp ki kd df slow thr N | noise ambient fail N | gains | stats | quiet loud\n");
-    printf("  station  : python tools/station/station.py - the OLED large, the race from above\n");
+    printf("  station  : uv run tools/station/station.py - the OLED large, the race from above\n");
     printf("%s\n", keys_help);
     kbd_init(&kbd);
 

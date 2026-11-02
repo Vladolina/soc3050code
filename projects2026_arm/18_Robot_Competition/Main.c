@@ -33,7 +33,7 @@
  * - the line a student submits.  host/league.c re-runs the same tournament
  * on a PC and must print the same <hash>.
  *
- * The station on the PC (python tools/station/station.py) draws the arena
+ * The station on the PC (uv run tools/station/station.py) draws the arena
  * large, keeps the standings, and sends real key-down/up for every control
  * (kbd.h: arrows = stick, a = A, b = B, s = SEL, 1-5 = speed).  While it is
  * connected - and only then - the board also sends the OLED (mirror.h) and,
@@ -498,7 +498,7 @@ int main(void)
     if (pad_init() != 0) { say("pad: ADC did not start - joystick and knob read 0\n"); }
     beep_init();
     say("A start  B next opponent  SEL driver/cones  knob speed.  Serial: tour [seed], seed N, stats\n");
-    say("station: python tools/station/station.py - arena, standings, OLED; keys a b s 1-5, arrows\n");
+    say("station: uv run tools/station/station.py - arena, standings, OLED; keys a b s 1-5, arrows\n");
     kbd_init(&kbd);
 
     os_task_create("sim",   task_sim,   0, stk_sim,   512, 3);

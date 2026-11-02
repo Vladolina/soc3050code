@@ -19,7 +19,7 @@
  *   task "shell"           the serial line: commands, $GOAL/$MAP frames from
  *                          host/planner.py, $KEY/$MIRROR from the station
  *
- * The station, python tools/station/station.py, draws the robot's map large
+ * The station, uv run tools/station/station.py, draws the robot's map large
  * and sends the pad's controls as keys (kbd.h): arrows = stick, a = A,
  * b = B, s = SEL, 1-5 = knob.  "quiet" / "loud" stop and restart $NAV.
  *
@@ -617,7 +617,7 @@ int main(void)
     boot("  RAM      : navigation %lu B, of which A* %lu B\n",
            (unsigned long)nav_ram_bytes(), (unsigned long)astar_ram_bytes());
     boot("  controls : A start/restart  B next level  SEL show true walls  knob speed  stick moves goal\n");
-    boot("  station  : python tools/station/station.py - the map large, these controls as keys\n");
+    boot("  station  : uv run tools/station/station.py - the map large, these controls as keys\n");
     boot("%s", KEYS);
     boot("  shell    : type help; quiet / loud stop and restart $NAV\n\n");
 

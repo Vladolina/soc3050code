@@ -26,7 +26,7 @@
  *   quiet      shell -> telem      one byte, one writer: the shell
  *   heartbeats each task -> health one counter per task, one writer each
  *
- * THE STATION.  python tools/station/station.py, on the PC, is this board's
+ * THE STATION.  uv run tools/station/station.py, on the PC, is this board's
  * screen, keyboard and dashboard in one window.  Three things connect it:
  *   - its keys arrive as $KEY lines; the shell hands them to kbd_frame(),
  *     and input folds them into the pad with kbd_apply() - so app.c cannot
@@ -396,7 +396,7 @@ int main(void)
     printf("  watchdog : IWDG %u ms%s, fed by health every %u ms if all %u tasks beat\n",
            WDOG_TIMEOUT_MS, w == 0 ? "" : " (update flags stuck)", HEALTH_MS, (unsigned)T_WATCHED);
     printf("  shell    : help  stats  health  scan  hang <task>  spin <task>  reset  quiet  loud\n");
-    printf("  station  : python tools/station/station.py - the OLED large, $APP/$SYS charts, keys\n");
+    printf("  station  : uv run tools/station/station.py - the OLED large, $APP/$SYS charts, keys\n");
     printf("%s\n", KEYS_HELP);              /* say() needs the scheduler running */
     kbd_init(&kbd);
     beep(660, 60, 0);

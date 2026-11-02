@@ -40,8 +40,8 @@ PC to measure everything this README quotes.
 build.bat        # FLASH 29484 B / 32 KB, RAM 9744 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
-python host\leaderboard.py captures\*.txt
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run host\leaderboard.py captures\*.txt
 ```
 
 Controls: menu — joystick up/down, **A** to choose. Race — **A** start / stop
@@ -52,7 +52,7 @@ Controls: menu — joystick up/down, **A** to choose. Race — **A** start / sto
 ### Run it from the station
 
 Start the simulation from VS Code (`wokwi.toml` carries
-`rfc2217ServerPort = 4000`), then `python tools/station/station.py` from
+`rfc2217ServerPort = 4000`), then `uv run tools/station/station.py` from
 the repository root. The OLED appears large, and beside it the race from
 above (`tools/station/views/l15_line.py`): the track, the robot to scale with
 its sensor spots, the path it drove, a close-up in the robot's frame, the

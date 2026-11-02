@@ -998,14 +998,14 @@ Angles in tenths of a degree, motors in thousandths — integers, because
 `$EST,<ms>,<roll>,<pitch>,<accel-only roll>,<accel-only pitch>`.
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
+uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
 ```
 
 charts the estimated roll (field 2) from a capture; field 6 is the truth.
 Chart both in turn and you have slide 11's error, from the simulator, by
 hand.
 
-Live instead: `python tools/station/station.py` draws the same frames as a
+Live instead: `uv run tools/station/station.py` draws the same frames as a
 window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and
 sends keys for every control; `quiet` / `loud` stop and restart `$ATT`. Not
 yet watched in Wokwi.

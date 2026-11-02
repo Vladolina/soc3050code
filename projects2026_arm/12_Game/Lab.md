@@ -103,7 +103,7 @@ paddle pause once before auto-repeat starts.
 **Best: play from the station.** With the simulation running, start
 
 ```
-python tools\station\station.py
+uv run tools\station\station.py
 ```
 
 from the repository root. The OLED appears five times larger, `$PERF` is
@@ -236,7 +236,7 @@ sprite.
 then
 
 ```
-python host\sprite.py apple.txt
+uv run host\sprite.py apple.txt
 ```
 
 It prints the bytes `oled_sprite()` wants — **columns, bit 0 at the top**.
@@ -337,14 +337,14 @@ $SCORE,FLAP,23*52
 `scores\kim.txt` (one folder for the class, one file per player), then
 
 ```
-python host\leaderboard.py scores\*.txt
+uv run host\leaderboard.py scores\*.txt
 ```
 
 **Guess first:** change one digit of your score in the file. What happens?
 
 > The line is **rejected**: the two hex digits are the XOR of every character
 > between `$` and `*` (lesson 08's `proto_checksum()`), and a changed digit
-> changes the XOR. `python host\leaderboard.py --check '$SCORE,FLAP,23*52'`
+> changes the XOR. `uv run host\leaderboard.py --check '$SCORE,FLAP,23*52'`
 > shows the checksum it expects.
 >
 > Now compute the right checksum for your edited line by hand — XOR the ASCII

@@ -28,7 +28,7 @@
  * "quiet" / "loud" + Enter stop and restart $PERF.  So the OLED can be zoomed
  * to fill the window and the game played without seeing the board.
  *
- * Better still, the station: python tools/station/station.py draws the OLED
+ * Better still, the station: uv run tools/station/station.py draws the OLED
  * large on the PC (this file sends it as $FB frames when asked) and sends
  * real key-down and key-up ($KEY frames), so a held key is simply held.
  *
@@ -303,7 +303,7 @@ int main(void)
     printf("  buzzer   : PA6, TIM3_CH1\n");
     printf("  frames   : $SCORE,game,score  per game;  $PERF,fps,ups,flush_us,max_us,bytes,busy%%,mode  per second\n");
     printf("  stick press toggles the profiler mode: dirty pages / full repaint\n");
-    printf("  station  : python tools/station/station.py - the OLED large, keys up and down\n");
+    printf("  station  : uv run tools/station/station.py - the OLED large, keys up and down\n");
     print_keys();
     printf("  pace     : %u %% - one %u ms game tick every %u ms; - and + change it\n",
            (unsigned)pace_pct[PACE_START], (unsigned)TICK_MS, (unsigned)pace_ms(PACE_START));

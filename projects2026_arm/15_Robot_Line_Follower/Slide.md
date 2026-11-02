@@ -883,8 +883,8 @@ $LAP,<track>,<ms>*CS                                                      every 
 world *knows*. Plot both and the gap between them is your sensor model:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
-python host\leaderboard.py captures\*.txt
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run host\leaderboard.py captures\*.txt
 ```
 
 `leaderboard.py` checks every `$LAP` checksum, keeps each student's best lap
@@ -892,7 +892,7 @@ per track, and ranks them. Manual laps are printed but never framed: the
 leaderboard ranks **controllers**, not thumbs.
 
 The fields after `<slip>` are for the **station**
-(`python tools/station/station.py`): true position and heading, the track
+(`uv run tools/station/station.py`): true position and heading, the track
 and the seven readings draw the race from above, beside the OLED drawn
 large; the keyboard is the app board (arrows, `a`, `b`, `s`, `1`-`5`,
 `-`/`+`), and `quiet` / `loud` stop and restart `$LINE`. Appended at the

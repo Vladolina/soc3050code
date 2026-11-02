@@ -653,11 +653,11 @@ which by itself demands a steady acceleration.
 and prints its eigenvalues — **measured on the host**:
 
 ```
-$ python lqr.py --pid 150,0,4
+$ uv run lqr.py --pid 150,0,4
   +1.00152+0.00000j   |z| = 1.00152   UNSTABLE: grows e-fold every 3.29 s
-$ python lqr.py --pid 25,0,2
+$ uv run lqr.py --pid 25,0,2
   +1.00847-0.00000j   |z| = 1.00847   UNSTABLE: grows e-fold every 0.59 s
-$ python lqr.py --pid 150,50,4
+$ uv run lqr.py --pid 150,50,4
   +1.00000+0.00000j   |z| = 1.00000   = 1: position - nothing pulls it back (drift)
   +0.99992-0.00035j   |z| = 0.99992   slow swing, period 88.9 s
 ```
@@ -797,7 +797,7 @@ two, so every step is readable.
 
 ## Slide 18: The Numbers — and the Proof It Stabilises
 
-**Measured on the host**, `python host/lqr.py`:
+**Measured on the host**, `uv run host/lqr.py`:
 
 ```
 K = [ -5.1239  -15.2554  -21.2619  -2.4627 ]    u = -K x
@@ -974,8 +974,8 @@ controller's estimate go out, so the complementary filter's error can be
 charted directly:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,4,-30000,30000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,4,-30000,30000
 ```
 
 Field 3 is the truth, field 4 the estimate. Push the robot with `b` and the two

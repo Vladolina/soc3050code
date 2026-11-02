@@ -45,7 +45,7 @@ frames go to lesson 08's `host.py`, or to the PC's station
 build.bat        # FLASH 26280 B / 32 KB, RAM 10408 B / 12 KB, zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf
 host\run.bat     # or: bash host/run.sh  - exits 0, "all checks passed"
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
 ```
 
 Controls: joystick up/down drives (±0.4 m/s), **space** (SEL) cycles the
@@ -59,7 +59,7 @@ The PC's ground station draws the robot large instead of on a 128 x 64 panel:
 
 ```
 simulate.bat                          # Wokwi in VS Code; wokwi.toml forwards USART2 to port 4000
-python tools/station/station.py       # from the repository root
+uv run tools/station/station.py       # from the repository root
 ```
 
 The first `$BAL` frame selects `tools/station/views/l17_balance.py`: the robot

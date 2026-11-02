@@ -49,7 +49,7 @@ polling.
 build.bat        # FLASH 18780 B / 32 KB, RAM 10552 B / 12 KB, zero warnings
 host\run.bat     # 15 checks, 0 failed, exit code 0
 simulate.bat
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart SYS,2,0,1000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart SYS,2,0,1000
 ```
 
 `$APP,<ms>,<x>,<y>,<vx>,<vy>,<score>` at 10 Hz; once a second
@@ -61,7 +61,7 @@ python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart SYS,2,0,100
 
 ```
 simulate.bat                              # start the simulation in VS Code (Wokwi)
-python tools/station/station.py           # from the repository root
+uv run tools/station/station.py           # from the repository root
 ```
 
 The station is one window on the PC: the board's OLED drawn large, this

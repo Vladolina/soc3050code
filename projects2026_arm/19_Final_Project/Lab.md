@@ -90,7 +90,7 @@ Which task uses the most CPU? Which stack is closest to full?
 With the simulation running, from the repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 Click the OLED picture and steer with the arrow keys: `a` brakes, `b`

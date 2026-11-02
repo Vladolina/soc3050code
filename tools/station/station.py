@@ -3,9 +3,9 @@
 station.py - the ground station: the board's screen, keyboard and telemetry,
 on the PC.
 
-    python tools/station/station.py                         Wokwi in VS Code (the default port)
-    python tools/station/station.py --port COM5             a real Nucleo on USB
-    python tools/station/station.py --port socket://localhost:4001   tools/station/fakeboard.py
+    uv run tools/station/station.py                         Wokwi in VS Code (the default port)
+    uv run tools/station/station.py --port COM5             a real Nucleo on USB
+    uv run tools/station/station.py --port socket://localhost:4001   tools/station/fakeboard.py
 
 One window, three parts:
 

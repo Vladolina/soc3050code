@@ -47,8 +47,8 @@ waypoints, altitude, battery, wind.
 build.bat        # FLASH 29600 B / 32 KB (90.3 %), RAM 10776 B / 12 KB (87.7 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
-python host\mission.py host\default.mission          # frames to type/paste into Wokwi
-python host\mission.py --score capture.txt --race    # score a captured flight
+uv run host\mission.py host\default.mission          # frames to type/paste into Wokwi
+uv run host\mission.py --score capture.txt --race    # score a captured flight
 ```
 
 Task stacks are 160/224/320/288/288 words (world/ctl/link/tel/ui), sized from
@@ -64,7 +64,7 @@ telemetry. In VS Code, start the Wokwi simulation (`wokwi.toml` opens
 `rfc2217ServerPort = 4000`), then from the repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 The first `$POS` selects the view `tools/station/views/l14_mission.py`: a

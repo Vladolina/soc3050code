@@ -140,7 +140,7 @@ Each lesson folder holds `Main.c`, `config.h`, `Slide.md`, `README.md`,
 Every lesson has a `Slide.md`. To turn all 25 into presentable HTML decks:
 
 ```
-python projects2026_avr\_build\build-slides.py
+uv run projects2026_avr\_build\build-slides.py
 ```
 
 Open `projects2026_avr/_slides/index.html`. Arrow keys or space to move, `o`

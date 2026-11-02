@@ -634,7 +634,7 @@ monitor shows what you made.
 Nothing here is handed in. If you want to push further:
 
 - Disassemble the copy loop you deleted in Part 1 and compare it with slide 11:
-  `python ..\_build\disasm.py Main.elf -f Reset_Handler`
+  `uv run ..\_build\disasm.py Main.elf -f Reset_Handler`
 - Dump the vector table as bytes and decode more of it than slide 7 did:
   `..\..\tools\arm-toolchain\bin\arm-none-eabi-objdump.exe -s -j .isr_vector Main.elf`
 - Find `Reset_Handler` in `Main.map` and confirm its address matches word 1 of

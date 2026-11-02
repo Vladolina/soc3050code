@@ -579,11 +579,11 @@ u = TILT_KP * est.th + TILT_KI * integ + TILT_KD * in-&gt;gyro;   /* 150, 50, 4 
 <section class="slide">
 <h2>Slide 13: The Eigenvalues Agree</h2>
 <p><code>lqr.py --pid KP,KI,KD</code> closes the tilt-only loop around the <em>linear</em> model<br>and prints its eigenvalues — <strong>measured on the host</strong>:</p>
-<pre><code>$ python lqr.py --pid 150,0,4
+<pre><code>$ uv run lqr.py --pid 150,0,4
   +1.00152+0.00000j   |z| = 1.00152   UNSTABLE: grows e-fold every 3.29 s
-$ python lqr.py --pid 25,0,2
+$ uv run lqr.py --pid 25,0,2
   +1.00847-0.00000j   |z| = 1.00847   UNSTABLE: grows e-fold every 0.59 s
-$ python lqr.py --pid 150,50,4
+$ uv run lqr.py --pid 150,50,4
   +1.00000+0.00000j   |z| = 1.00000   = 1: position - nothing pulls it back (drift)
   +0.99992-0.00035j   |z| = 0.99992   slow swing, period 88.9 s</code></pre>
 <ul><li><strong>PD alone runs away</strong> — slower the higher KP is (step 4 of slide 12 needs less tilt per volt), but always.</li><li><strong>Adding I</strong> turns the run-away into a swing with an 89-second period, just inside the unit circle. ∫θ acts like a speed sensor in disguise — a robot that has leaned forward for a while has gained speed.</li><li>Either way there is an eigenvalue at exactly 1: <strong>position</strong>. Nothing measures it, so nothing restores it.</li></ul>
@@ -650,7 +650,7 @@ K = (R + B&#x27;PB)^-1 B&#x27;PA</code></pre>
 </section>
 <section class="slide">
 <h2>Slide 18: The Numbers — and the Proof It Stabilises</h2>
-<p><strong>Measured on the host</strong>, <code>python host/lqr.py</code>:</p>
+<p><strong>Measured on the host</strong>, <code>uv run host/lqr.py</code>:</p>
 <pre><code>K = [ -5.1239  -15.2554  -21.2619  -2.4627 ]    u = -K x
   per unit:  -5.1 V per m,  -15.26 V per m/s,  -0.371 V per degree,  -0.0430 V per deg/s
 
@@ -899,8 +899,8 @@ TIM14-&gt;CR1 = TIM_CR1_CEN;</code></pre>
 <p>Every 100 ms, lesson 08&#x27;s checksummed frame:</p>
 <pre><code>$BAL,&lt;ms&gt;,&lt;mode&gt;,&lt;tilt mdeg&gt;,&lt;estimate mdeg&gt;,&lt;x mm&gt;,&lt;speed mm/s&gt;,&lt;mV&gt;,&lt;fallen&gt;,&lt;payload g&gt;*CS</code></pre>
 <p>Integers only — newlib-nano&#x27;s <code>printf</code> has no <code>%f</code>. Both the true tilt and the<br>controller&#x27;s estimate go out, so the complementary filter&#x27;s error can be<br>charted directly:</p>
-<pre><code>python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,4,-30000,30000</code></pre>
+<pre><code>uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,4,-30000,30000</code></pre>
 <p>Field 3 is the truth, field 4 the estimate. Push the robot with <code>b</code> and the two<br>part company for a moment — the accelerometer being fooled by the robot&#x27;s own<br>acceleration (slide 8).</p>
 </section>
 <section class="slide">

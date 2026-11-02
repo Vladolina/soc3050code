@@ -89,7 +89,7 @@ Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board), then
   drone    : simulated in this chip - world 100 Hz, control 50 Hz, GPS 10 Hz
   press A to fly the built-in mission, or paste mission.py's frames
   shell    : stats  params  mission  tel  quiet  loud
-  station  : python tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?
+  station  : uv run tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?
 ```
 
 then `$POS` and `$TRU` frames five times a second. Type `tel` (or `quiet`; `loud` brings them back) to silence them,
@@ -130,7 +130,7 @@ Copy the whole serial monitor into `capture.txt` when it lands (`DISARMED`),
 and score it:
 
 ```
-python mission.py --score ..\capture.txt --race
+uv run mission.py --score ..\capture.txt --race
 ```
 
 > **Predicted from the host:** `sitl --fly 5` flies this mission in 5 m/s in
@@ -176,7 +176,7 @@ are all fair game.
 
 **In Wokwi (not watched):** fly to HOLD (press A, then the joystick button),
 turn the knob to 1000 (10 m/s) and paste `$PARAM,KI_VEL,0*..` — build the
-frame with `python ..\..\08_UART_And_Python_Host\host.py --frame "PARAM,KI_VEL,0"`.
+frame with `uv run ..\..\08_UART_And_Python_Host\host.py --frame "PARAM,KI_VEL,0"`.
 The drone on the map should slide downwind and stop about 1.5–2 m away.
 
 ---
@@ -214,10 +214,10 @@ an estimate that is updated ten times a second?
 Then fly it on the PC and score it:
 
 ```
-python mission.py --gen figure8 25 8 12 > my8.mission
-python mission.py my8.mission > my8.txt
+uv run mission.py --gen figure8 25 8 12 > my8.mission
+uv run mission.py my8.mission > my8.txt
 out\sitl --fly 8 my8.txt
-python mission.py --score out\fly.log --race
+uv run mission.py --score out\fly.log --race
 ```
 
 **Guess first:** where on the 8 will the cross-track error be worst — on the
@@ -287,9 +287,9 @@ waypoints, unchanged) in **8 m/s wind, seed 1**, as fast as you can, while
 Break any rule and the time does not count. Change only parameters:
 
 ```
-python mission.py default.mission > race.txt
+uv run mission.py default.mission > race.txt
 out\sitl --fly 8 race.txt CRUISE=500
-python mission.py --score out\fly.log --race
+uv run mission.py --score out\fly.log --race
 ```
 
 **Beat these** (measured on the host):
@@ -317,7 +317,7 @@ still.)
 an RFC 2217 port, so
 
 ```
-python mission.py default.mission --port rfc2217://localhost:4000 --log flight.log
+uv run mission.py default.mission --port rfc2217://localhost:4000 --log flight.log
 ```
 
 sends each frame, **waits for its `$ACK`**, resends up to three times, and
@@ -344,7 +344,7 @@ key, and draws this lesson's telemetry as a full-window map. Start the Wokwi
 simulation from VS Code, then from the repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 Click the picture so the keyboard belongs to the board: **arrows** = stick,

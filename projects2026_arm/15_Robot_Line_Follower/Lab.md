@@ -62,7 +62,7 @@ Start Simulation…** → `Main.elf`. The serial monitor shows:
   OLED     : SSD1306 at 0x3C
   world    : 200 Hz physics, 100 Hz control, 7 sensors at 13 mm
   shell    : kp ki kd df slow thr N | noise ambient fail N | gains | stats | quiet loud
-  station  : python tools/station/station.py - the OLED large, the race from above
+  station  : uv run tools/station/station.py - the OLED large, the race from above
   keys     : arrows = stick, a = A, b/p = B, s = SEL, 1-5 = knob, ? = this
              - / + = knob -/+ 50 (100 mm/s),  quiet / loud = stop / restart $LINE
 ```
@@ -114,8 +114,8 @@ Press **SEL** again to hand back to `control.c`.
 `capture.txt` and chart two fields of `$LINE`:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,2,-400,400
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,2,-400,400
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
 ```
 
 Field 2 is the controller's estimate of the line position, field 3 the world's
@@ -177,7 +177,7 @@ prints `$LAP,<track>,<ms>*CS`. At the end, save your serial monitor as
 `yourname.txt` in a shared folder and run:
 
 ```
-python host\leaderboard.py captures\*.txt
+uv run host\leaderboard.py captures\*.txt
 ```
 
 **The numbers to beat — measured on the host, default gains:**
@@ -215,7 +215,7 @@ df 1
 two wheel commands:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,4,-2000,2000
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,4,-2000,2000
 ```
 
 Then `df 0.5` (the default), then `df 0.25`.
@@ -334,7 +334,7 @@ and `$LINE` and `$LAP` as charts.
 repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 Click the station's picture and the keyboard is the app board:

@@ -861,10 +861,10 @@ seed): 14.6 s, 27.6 s, 19.0 s, 40.0 s and 29.0 s; 3, 12, 4, 43 and 14 replans;
 ## Slide 21: The Python Tier — `host/planner.py`
 
 ```
-python host/planner.py --level 3                 the level, and the A* path on it
-python host/planner.py --map mine.txt --frames   frames to paste into the serial monitor
-python host/planner.py --file capture.txt        read telemetry + check the board's plan
-python host/planner.py --compare paths.txt       check every level against astar.c
+uv run host/planner.py --level 3                 the level, and the A* path on it
+uv run host/planner.py --map mine.txt --frames   frames to paste into the serial monitor
+uv run host/planner.py --file capture.txt        read telemetry + check the board's plan
+uv run host/planner.py --compare paths.txt       check every level against astar.c
 ```
 
 Same costs, same neighbour order, same `(f, h, cell)` tie-break — so it finds
@@ -916,7 +916,7 @@ tearing the result (lesson 03). It wraps every 89 s; differences do not care.
 First build: **34 932 B of flash and 15 136 B of RAM** (counting the linker's
 1.5 KB heap and main-stack reserve) — on a 32 KB / 12 KB chip. Now **29 216 B
 and 11 328 B** — **31 100 B and 11 584 B** with the PC station's keys and OLED
-mirror (`LIBS += keys kbd mirror`; run `python tools/station/station.py`, not
+mirror (`LIBS += keys kbd mirror`; run `uv run tools/station/station.py`, not
 yet watched in Wokwi). What got it there, each measured build to build:
 
 | Change | Saved |

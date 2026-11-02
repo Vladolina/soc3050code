@@ -32,7 +32,7 @@
  * Simulate:  simulate.bat, paste diagram.json, upload Main.elf
  * Host:      host\run.bat - lqr.py, then the SAME world.c and control.c on the PC
  * Chart:     python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
- * Station:   python tools/station/station.py - the robot large, the OLED, keys
+ * Station:   uv run tools/station/station.py - the robot large, the OLED, keys
  *            held for as long as they are held (kbd.h, mirror.h)
  */
 #include <stdarg.h>
@@ -440,7 +440,7 @@ int main(void)
     printf("  control  : LQR (SEL cycles PID tilt -> cascade -> LQR)\n");
     printf("  buttons  : A stand up, B push, knob payload, stick drive\n");
     printf("  shell    : stats  mode  noise  alpha  vbat  push  k  quiet  loud\n");
-    printf("  station  : python tools/station/station.py - the robot large, keys up and down\n");
+    printf("  station  : uv run tools/station/station.py - the robot large, keys up and down\n");
     print_keys();
     printf("\n");
     kbd_init(&kbd);

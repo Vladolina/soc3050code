@@ -335,7 +335,7 @@ What do the two CPUs emit?
 **Also try** the cycle model with the *small* multiplier option:
 
 ```
-python host\m0sim.py Main.elf --mul 32 --ws 0
+uv run host\m0sim.py Main.elf --mul 32 --ws 0
 ```
 
 > **Measured on the host:** with a 32-cycle `MULS`, Q16.16 multiply rises

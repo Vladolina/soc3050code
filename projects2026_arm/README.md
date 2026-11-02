@@ -64,7 +64,7 @@ Arrow keys move, `o` gives an overview grid, `p` prints or saves as PDF.
 Re-render after editing any `Slide.md`:
 
 ```
-python projects2026_arm/_build/build-slides.py
+uv run projects2026_arm/_build/build-slides.py
 ```
 
 `_slides/` is generated. Edit the `Slide.md`, never the HTML.
@@ -86,7 +86,7 @@ Two files, one derived from the other:
 
 - `_targets/c031c6-pins.json` — the facts, committed. Derived from Wokwi's
   board definition (`wokwi/wokwi-boards`, `boards/st-nucleo-c031c6/board.json`)
-  by `python _build/wokwi-pins.py --refresh`. That repository declares no
+  by `uv run _build/wokwi-pins.py --refresh`. That repository declares no
   licence, so the board file itself is **not** vendored; only the name-to-pin
   facts are, in our own format.
 - `_slides/board-pins.html` — the page. `build-slides.py` renders it on every
@@ -112,9 +112,9 @@ From lesson 04 on, every deck opens with two generated slides, so students see
   is course knowledge, in the `LESSONS` table of `_build/pinmap.py`.
 
 ```
-python _build/pinmap.py              # after changing any diagram.json or LESSONS
-python _build/pinmap.py --refresh    # re-derive the layout facts from Wokwi
-python _build/build-slides.py        # then re-render
+uv run _build/pinmap.py              # after changing any diagram.json or LESSONS
+uv run _build/pinmap.py --refresh    # re-derive the layout facts from Wokwi
+uv run _build/build-slides.py        # then re-render
 ```
 
 A slide opts in with a ```` ```svg ```` block whose first line is the
@@ -441,6 +441,24 @@ _spike/f446re/   Nucleo F446RE (Cortex-M4F)  - builds, runs in Renode
 Each carries the three files that replace what avr-libc did for free:
 `startup.c` (vector table, reset handler, `.data`/`.bss` init, clock),
 `link.ld` (memory map), and a `main.c` that blinks and prints over USART2.
+
+## Setting up a PC (once)
+
+1. **Clone into a short folder** (`C:\work\`): the vendored SimulIDE has long
+   paths, and a deep folder makes the checkout fail (root README).
+2. **VS Code**, opened at the repository root. Accept the recommended
+   extensions - **Wokwi** simulates the lessons (activate its licence once).
+3. **uv**, once: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+   (or `winget install astral-sh.uv`), then in a new terminal at the root:
+   `uv sync`. That fetches Python 3.12 and every package the PC-side tools use.
+4. **Build before simulating**: the firmware is not in git. Open a lesson's
+   `Main.c` and press **Ctrl+Shift+B** (or run `build.bat` in its folder).
+5. **Simulate**: F1 → *Wokwi: Start Simulator* with the lesson's folder.
+6. **Station** (lessons 12-19): **Terminal → Run Task → ARM: Station**, or
+   `uv run tools/station/station.py`. Click the OLED; the keyboard is the board.
+
+Every Python command in these lessons is written `uv run X.py`; it works from
+any folder inside the repository.
 
 ## Building
 

@@ -81,7 +81,7 @@ host\run.bat          (or:  bash host/run.sh)
 It ends `all checks passed` and exits 0.
 
 **Run it from the station (optional).** With the simulation running in VS
-Code, `python tools/station/station.py` from the repository root draws the
+Code, `uv run tools/station/station.py` from the repository root draws the
 robot large: the body at the true tilt, the controller's estimate as a dashed
 ghost, and charts of both tilts, the motor volts and the position. Its keys
 are held as long as you hold them - arrows drive, `a` stand up, `b` push, `s`
@@ -134,9 +134,9 @@ does it go?
 Now prove it without a simulation:
 
 ```
-python host\lqr.py --pid 150,50,4
-python host\lqr.py --pid 150,0,4
-python host\lqr.py --pid 25,0,2
+uv run host\lqr.py --pid 150,50,4
+uv run host\lqr.py --pid 150,0,4
+uv run host\lqr.py --pid 25,0,2
 ```
 
 > An eigenvalue at exactly 1 in all three — position, which nothing controls.
@@ -192,7 +192,7 @@ The default `Q = diag(30, 2, 50, 0.5)`, `R = 1`. Change them on the command
 line — `params.h` is not touched:
 
 ```
-python host\lqr.py --Q 30,2,500,0.5 --R 1
+uv run host\lqr.py --Q 30,2,500,0.5 --R 1
 ```
 
 It prints K, the closed-loop eigenvalues and one line of C. **Paste that line
@@ -321,7 +321,7 @@ x in mm) plus 5 × the number of falls. Lowest wins. Capture the serial output
 and chart your run:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,5,-200,1200
+uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,5,-200,1200
 ```
 
 **Something to notice first.** In the host's drive test both cascade and LQR

@@ -835,7 +835,7 @@ RAM: **9 872 B** of 12 KB — three task stacks (512 + 384 + 384 words), the
 OLED's 1 KB framebuffer, the match.
 
 What is left — about 0.4 KB under the line, 3.4 KB under 32 KB — is **your**
-`student.c`'s budget. The station (`python tools/station/station.py`) costs
+`student.c`'s budget. The station (`uv run tools/station/station.py`) costs
 2.1 KB of it and only watches: `$ARENA` is built from the display's copy of
 the snapshot, so the `$RESULT` hash cannot change. Not yet watched in Wokwi.
 

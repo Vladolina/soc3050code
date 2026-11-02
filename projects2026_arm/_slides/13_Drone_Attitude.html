@@ -842,9 +842,9 @@ for (int x = 1; x &lt; 63; x++) {
 <p>Every 40 ms, a lesson 08 frame with its checksum:</p>
 <pre><code>$ATT,&lt;ms&gt;,&lt;roll&gt;,&lt;pitch&gt;,&lt;roll set&gt;,&lt;pitch set&gt;,&lt;true roll&gt;,&lt;true pitch&gt;,&lt;M0&gt;,&lt;M1&gt;,&lt;M2&gt;,&lt;M3&gt;,&lt;armed&gt;,&lt;Kp x100&gt;*CS</code></pre>
 <p>Angles in tenths of a degree, motors in thousandths — integers, because<br><code>printf</code> here has no float support. In MPU mode it is<br><code>$EST,&lt;ms&gt;,&lt;roll&gt;,&lt;pitch&gt;,&lt;accel-only roll&gt;,&lt;accel-only pitch&gt;</code>.</p>
-<pre><code>python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300</code></pre>
+<pre><code>uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300</code></pre>
 <p>charts the estimated roll (field 2) from a capture; field 6 is the truth.<br>Chart both in turn and you have slide 11&#x27;s error, from the simulator, by<br>hand.</p>
-<p>Live instead: <code>python tools/station/station.py</code> draws the same frames as a<br>window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and<br>sends keys for every control; <code>quiet</code> / <code>loud</code> stop and restart <code>$ATT</code>. Not<br>yet watched in Wokwi.</p>
+<p>Live instead: <code>uv run tools/station/station.py</code> draws the same frames as a<br>window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and<br>sends keys for every control; <code>quiet</code> / <code>loud</code> stop and restart <code>$ATT</code>. Not<br>yet watched in Wokwi.</p>
 </section>
 <section class="slide">
 <h2>Slide 26: What Was Measured — and What Could Not Be</h2>

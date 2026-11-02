@@ -72,7 +72,7 @@ when a key is *released*, so an arrow holds the stick for 150 ms and the
 PC's auto-repeat renews it; before auto-repeat starts the stick lets go
 once, and a BREAKOUT paddle stutters at first. `_lib/kbd.h` explains.
 
-**Better: the station.** `python tools/station/station.py` (with the
+**Better: the station.** `uv run tools/station/station.py` (with the
 simulation running in VS Code) draws the OLED five times larger on the PC,
 charts `$PERF`, lists every `$SCORE`, and sends each key as a real key-down
 and key-up (`$KEY` frames), so a held arrow is simply held — no auto-repeat

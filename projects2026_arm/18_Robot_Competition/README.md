@@ -59,7 +59,7 @@ Result line: `$RESULT,<name>,<W>,<D>,<L>,<hash>,<max cycles>,<build>*CS`
 (NMEA XOR checksum, lesson 08). Per match: `$MATCH,<robot0>,<robot1>,<seed>,<winner 0/1/-1>,<rounds0>,<rounds1>,<hash>*CS`.
 
 **Run it from the station.** With the simulation running in VS Code,
-`python tools/station/station.py` (repository root) draws the dohyo large —
+`uv run tools/station/station.py` (repository root) draws the dohyo large —
 both robots with their headings, names, round score and clock — keeps the
 standings from every `$MATCH` and `$RESULT`, shows the OLED copied from
 `_lib/mirror.c`, and sends real key-down/up for every control: arrows = the

@@ -484,7 +484,7 @@ int main(void)
         (unsigned)WORLD_HZ, (unsigned)CTRL_HZ);
     say("  press A to fly the built-in mission, or paste mission.py's frames\n");
     say("  shell    : stats  params  mission  tel  quiet  loud\n");
-    say("  station  : python tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?\n\n");
+    say("  station  : uv run tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?\n\n");
     kbd_init(&kbd);
 
     os_task_create("world", task_world, 0, stk_world, 160, 5);

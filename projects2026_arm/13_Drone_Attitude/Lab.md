@@ -56,7 +56,7 @@ board), then upload `Main.elf`.
   MPU6050  : 0x68 awake, DLPF 44 Hz (MPU mode available)
   world    : 500 Hz quad on a gimbal; control 250 Hz
   A arm, B gust, SEL sim/mpu, knob Kp.  Shell: stats alpha aw mix kick hold quiet loud
-  station  : python tools/station/station.py - arrows stick, a arm, b gust,
+  station  : uv run tools/station/station.py - arrows stick, a arm, b gust,
              s SIM/MPU, 1-5 Kp, ? keys; the OLED drawn large
 ```
 
@@ -216,8 +216,8 @@ it again. If it flips, it resets after 2 s.
 monitor's text into `cap.txt` and run:
 
 ```
-python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
-python ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,6,-300,300
+uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,2,-300,300
+uv run ..\08_UART_And_Python_Host\host.py --file cap.txt --chart ATT,6,-300,300
 ```
 
 Field 2 is the estimated roll in tenths of a degree, field 6 the true roll,
@@ -250,7 +250,7 @@ simulation from the **Wokwi VS Code extension** (its `wokwi.toml` forwards
 the serial port), then, from the repository root:
 
 ```
-python tools/station/station.py
+uv run tools/station/station.py
 ```
 
 The OLED appears large on the left; the first `$ATT` picks the attitude

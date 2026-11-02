@@ -82,7 +82,7 @@ Press button A a few times and watch the fifth field of `$TEL` count.
 On your PC, in this folder:
 
 ```
-python host.py --selftest
+uv run host.py --selftest
 ```
 
 > ```
@@ -97,7 +97,7 @@ python host.py --selftest
 Now make a frame and give it to the board:
 
 ```
-python host.py --frame "LED,85"
+uv run host.py --frame "LED,85"
 ```
 
 It prints `$LED,85*6C`. Paste that into the serial monitor's input box.
@@ -121,7 +121,7 @@ Let the board run for ten seconds with `rate 250`. Select all the text in the
 serial monitor, copy it, and save it as `capture.txt` in this folder. Then:
 
 ```
-python host.py --file capture.txt
+uv run host.py --file capture.txt
 ```
 
 > **Measured** on a Renode session:
@@ -142,7 +142,7 @@ another `$TEL` line entirely. Run it again.
 
 > The changed line is counted **bad**. The deleted one shows up as a
 > **sequence gap** — and so does the changed one, because its sequence number
-> never arrived intact. `python host.py --demo` does the same to made-up data if
+> never arrived intact. `uv run host.py --demo` does the same to made-up data if
 > you want to see it without a board.
 
 If you have matplotlib, add `--plot`.
@@ -156,7 +156,7 @@ Two ways round that:
 
 - **Wokwi VS Code extension:** this folder's `wokwi.toml` contains
   `rfc2217ServerPort = 4000`. Start the simulator in VS Code, then
-  `python host.py --port rfc2217://localhost:4000 --send "RATE,100" --seconds 10`
+  `uv run host.py --port rfc2217://localhost:4000 --send "RATE,100" --seconds 10`
 - **A real Nucleo-C031C6** on USB: `--port COM5` (or whatever Device Manager
   says).
 

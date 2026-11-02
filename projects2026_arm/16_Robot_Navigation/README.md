@@ -44,8 +44,8 @@ cell.
 build.bat          # FLASH 31100 B / 32 KB, RAM 11584 B / 12 KB, zero warnings
 simulate.bat       # paste diagram.json, upload Main.elf, press A
 host\run.bat       # or: bash host/run.sh - the whole robot on the PC, ~1 s
-python host\planner.py --level 4
-python host\planner.py --file capture.txt
+uv run host\planner.py --level 4
+uv run host\planner.py --file capture.txt
 ```
 
 RAM includes the linker's 1.5 KB heap + main-stack reserve. The robot's own
@@ -68,7 +68,7 @@ bit 31 = x 0; y = 0 is the bottom row.
 ### Run it from the station
 
 ```
-python tools/station/station.py        # from the repository root, Wokwi running in VS Code
+uv run tools/station/station.py        # from the repository root, Wokwi running in VS Code
 ```
 
 `wokwi.toml` forwards the simulated USART2 to `rfc2217://localhost:4000`, and

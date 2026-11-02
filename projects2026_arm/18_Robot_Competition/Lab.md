@@ -83,7 +83,7 @@ starter finish?
 With the simulation running in VS Code, start
 
 ```
-python tools\station\station.py
+uv run tools\station\station.py
 ```
 
 from the repository root and click its picture. The dohyo appears large —

@@ -1,9 +1,9 @@
 # The station — the board's screen and keyboard on the PC
 
 ```
-python tools/station/station.py                          Wokwi in VS Code (default: rfc2217://localhost:4000)
-python tools/station/station.py --port COM5              a real Nucleo on USB
-python tools/station/station.py --port socket://localhost:4001   with fakeboard.py, no simulator
+uv run tools/station/station.py                          Wokwi in VS Code (default: rfc2217://localhost:4000)
+uv run tools/station/station.py --port COM5              a real Nucleo on USB
+uv run tools/station/station.py --port socket://localhost:4001   with fakeboard.py, no simulator
 ```
 
 The app board's OLED is 128 × 64 pixels — tiny in a simulator window, and too
