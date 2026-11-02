@@ -67,11 +67,12 @@ static void place_food(void)
 }
 
 /* The knob's level sets the starting pace; every fifth apple quickens it.
- * period = ticks per move: 8 at level 1 (6 cells/s) .. 4 at level 5 (12.5). */
+ * period = ticks per move: 16 at level 1 (3 cells/s) .. 8 at level 5 (6.25).
+ * (Halved from 8 .. 4 on 2026-11-03: too fast to follow in the simulator.) */
 static void set_pace(void)
 {
-    period = 9 - level - eaten / 5;
-    if (period < 2) { period = 2; }
+    period = 2 * (9 - level) - eaten / 5;
+    if (period < 4) { period = 4; }
 }
 
 static void snake_start(int lvl)

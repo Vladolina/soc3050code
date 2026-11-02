@@ -49,7 +49,7 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       19276 B        32 KB     58.83%
+           FLASH:       19304 B        32 KB     58.91%
              RAM:        4896 B        12 KB     39.84%
 ```
 
@@ -125,15 +125,15 @@ The host test's autopilots set the bar, at level 3:
 | Game | Autopilot (level 3) | How |
 |---|---|---|
 | SNAKE | **126** (42 apples) | flood fill + shortest path |
-| BREAKOUT | **1 395** in 5 min, never misses | predicts where the ball lands |
-| FLAP | **97** pipes | flaps when its feet near the gap's bottom |
+| BREAKOUT | **648** in 5 min, never misses | predicts where the ball lands |
+| FLAP | **75** pipes | flaps when its feet near the gap's bottom |
 
 **Guess first:** which one can a human beat?
 
 > SNAKE, probably: its autopilot is greedy and boxes itself in. BREAKOUT's
 > autopilot knows the ball's velocity exactly and never misses, so only its
 > *score rate* is beatable — by aiming at the top rows, which pay 4× level per
-> brick. FLAP's 97 is beatable by patient humans, and less so at higher speeds
+> brick. FLAP's 75 is beatable by patient humans, and less so at higher speeds
 > (Part 6).
 >
 > Every finished game printed a line like `$SCORE,SNAKE,42*1C`. Keep the best
@@ -163,9 +163,9 @@ $PERF,<fps>,<ups>,<flush_us>,<max_us>,<bytes/frame>,<busy %>,<mode>*CS
 >
 > | | fps | ups | bytes/frame | flush |
 > |---|---|---|---|---|
-> | SNAKE `DIRTY` | 50 | 50 | ~120 | ~3 ms |
+> | SNAKE `DIRTY` | 50 | 50 | ~47 | ~1 ms |
 > | SNAKE `FULL` | ~40 | 50 | 1 032 | ~25 ms |
-> | FLAP `DIRTY` | ~47 | 50 | ~870 | ~21 ms |
+> | FLAP `DIRTY` | 50 | 50 | ~625 | ~15 ms |
 >
 > **`ups` stays 50**: the snake moves at exactly the same speed. Only the
 > picture rate falls, because the fixed-step loop runs two updates before
@@ -207,7 +207,7 @@ so every frame clears the screen and redraws the wall and the whole snake.
 **Do this:** run `host\run.bat`.
 
 > The test still passes every *game* check — the game is unchanged — but the
-> bus table moves SNAKE from **129 to 970 bytes per frame** (88 % of a full
+> bus table moves SNAKE from **50 to 968 bytes per frame** (88 % of a full
 > repaint, every frame over the 20 ms tick), and the check *"dirty pages cut
 > SNAKE's bus traffic by more than 4x"* **fails** — measured on the host. Clearing changes every lit byte to 0 and redrawing changes it
 > back: two real changes per byte, so every page with anything on it is dirty
@@ -267,16 +267,16 @@ until it says so). Make it **10** (100 Hz).
 
 > Run the host test first. Two checks fail, and *which* two is the lesson:
 >
-> - FLAP's *"hovers 3 s then falls on tick 171"* now says **321**. The hover is
+> - FLAP's *"hovers 3 s then falls on tick 193"* now says **343**. The hover is
 >   written `3 * TICK_HZ` — three *seconds* — so it became 300 ticks. The fall
->   is in ticks, and the same 22 ticks now take half the time.
+>   is in ticks, and the same 44 ticks now take half the time.
 > - The arcade's high-score check fails because the 0.75 s hold after a game
 >   over is `TICK_HZ * 3 / 4` = 75 ticks now, and the script only waits 50.
 >
 > Everything written in ticks — SNAKE's move period, every speed, gravity —
 > now runs **twice as fast**; everything written in seconds stays put. The loop
-> table shows `ups` 100 and, in `FULL`, `fps` still ~40: nearly every frame now
-> runs 2 or 3 updates. `MAX_CATCHUP = 4` also covers only 40 ms now.
+> table shows `ups` 100 and, in `FULL`, `fps` still ~40: every frame now runs
+> 2 or 3 updates. `MAX_CATCHUP = 4` also covers only 40 ms now.
 >
 > A commercial engine would express every speed per *second* and scale by
 > `TICK_MS`; this one keeps ticks as the unit so the integer physics is exact
@@ -297,21 +297,24 @@ runs every autopilot at levels 1–5 with three seeds:
 
 ```
   level | SNAKE apples  survived | BREAKOUT bricks  survived | FLAP pipes  survived
-    1   |     67.7     111.3 s  |     117.3        300.0 s  |   135.3     104.8 s
-    2   |     67.7     100.9 s  |     154.0        300.0 s  |    92.7      73.3 s
-    3   |     67.7      92.6 s  |     129.7        300.0 s  |    63.3      48.9 s
-    4   |     67.7      85.8 s  |     154.7        300.0 s  |    15.3      13.9 s
-    5   |     67.7      81.0 s  |     230.0        299.1 s  |     3.7       4.6 s
+    1   |     56.0     265.5 s  |      86.3        300.0 s  |   121.7     194.3 s
+    2   |     61.0     235.8 s  |      85.7        300.0 s  |    65.3     108.8 s
+    3   |     67.3     212.3 s  |      84.7        300.0 s  |    43.0      71.4 s
+    4   |     67.7     188.2 s  |      89.0        300.0 s  |    31.3      51.2 s
+    5   |     67.7     169.5 s  |     106.0        300.0 s  |     1.7       6.2 s
 ```
 
-**Read it first.** FLAP falls off a **cliff** between levels 3 and 4: the gap
-shrinks 2 px per level (`gap = 28 - 2 * lvl`), and a flap climbs ~11 px, so
-below a 22 px gap there is almost no room to recover. SNAKE's apple count does
-not change with level at all — its autopilot is never in a hurry; only the
-time does.
+**Read it first.** FLAP's pipe count roughly halves from level 1 to 2, then
+falls more gently to 31 at level 4 — and then off a **cliff**: 1.7 pipes at
+level 5, 6.2 s survived. The gap shrinks 2 px per level
+(`gap = 28 - 2 * lvl`: 20 px at level 4, 18 at level 5) while a flap still
+climbs ~11 px. SNAKE's apple count hardly moves with level (56 at level 1,
+67-68 from level 3 up) — its autopilot is never in a hurry; only the
+survival time falls, from 266 s to 170 s.
 
 **Do this:** change FLAP's curve so the survival time falls *smoothly* —
-roughly halving per level, not dropping by 70 % at once. Ideas: shrink the gap
+falling step by step all the way to level 5, not dropping by 95 % at the last
+step. Ideas: shrink the gap
 by 1 px per level and raise `speed` instead; or soften `GRAVITY`. Re-run
 `--playtest` until the FLAP column looks like a curve, then run the full test
 to be sure nothing else broke.
@@ -350,7 +353,7 @@ python host\leaderboard.py scores\*.txt
 > class leaderboard, honesty plus a checksum is the right amount of security.
 >
 > **Challenge for the class:** highest FLAP at SPEED 5. The autopilot manages
-> 3.7 pipes there.
+> 1.7 pipes there.
 
 ---
 

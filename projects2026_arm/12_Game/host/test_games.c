@@ -362,8 +362,8 @@ int main(int argc, char **argv)
     CHECK(s.score == 3 * eats, "score = level x apples: %ld = 3 x %ld", (long)s.score, eats);
     run_t s0 = run(&game_snake, 3, 12345u, no_input, 2000, 0, 0, 0);
     /* head starts at cell 10 of 31 heading right: 20 moves to the last
-     * column, the 21st hits the wall; level 3 moves every 6 ticks. */
-    CHECK(s0.over && s0.ticks == 21 * 6, "no input: hits the wall on tick %d (predicted 21 x 6 = 126)", s0.ticks);
+     * column, the 21st hits the wall; level 3 moves every 12 ticks. */
+    CHECK(s0.over && s0.ticks == 21 * 12, "no input: hits the wall on tick %d (predicted 21 x 12 = 252)", s0.ticks);
     run_t sd = run(&game_snake, 3, 12345u, snake_pilot, 20000, 1, 0, 0);
     run_t sa = run(&game_snake, 3, 12345u, snake_pilot, 20000, 0, 0, 0);
     CHECK(sa.hash == s.hash && sa.score == s.score && sa.ticks == s.ticks,
@@ -397,9 +397,9 @@ int main(int argc, char **argv)
     CHECK(f.score >= 25, "bird passes pipes: %ld (need >= 25)", (long)f.score);
     run_t f0 = run(&game_flap, 3, 99u, no_input, 2000, 0, 0, 0);
     /* Hovers until tick 150, which is also the first tick of falling from
-     * y = 32.  After n ticks it has fallen 28 x n(n+1)/2 / 256 px, and it is
-     * down when y + 6 > 64, i.e. 27 px: n(n+1) >= 494 -> n = 22, tick 171. */
-    CHECK(f0.over && f0.ticks == 171, "no input: hovers 3 s then falls to the ground on tick %d (predicted 149 + 22 = 171)", f0.ticks);
+     * y = 32.  After n ticks it has fallen 7 x n(n+1)/2 / 256 px, and it is
+     * down when y + 6 > 64, i.e. 27 px: n(n+1) >= 1975 -> n = 44, tick 193. */
+    CHECK(f0.over && f0.ticks == 193, "no input: hovers 3 s then falls to the ground on tick %d (predicted 149 + 44 = 193)", f0.ticks);
     run_t fd = run(&game_flap, 3, 99u, flap_pilot, 6000, 1, 0, 0);
 
     /* ---- the bus budget --------------------------------------------------- */

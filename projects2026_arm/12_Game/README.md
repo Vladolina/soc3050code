@@ -40,12 +40,12 @@ a PC with scripted joysticks.
 ## Build and run
 
 ```
-build.bat        # FLASH 19276 B / 32 KB, RAM 4896 B / 12 KB, zero warnings
+build.bat        # FLASH 19304 B / 32 KB, RAM 4896 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # or: bash host/run.sh  - plain gcc, no board needed
 ```
 
-`arm-none-eabi-size -A`: `.text` 16 844, `.rodata` 2 112, `.data` 132,
+`arm-none-eabi-size -A`: `.text` 16 872, `.rodata` 2 112, `.data` 132,
 `.bss` 3 224 (framebuffer 1 032, snake ring 806, serial rings 544). The arcade's `.data + .bss`
 is 3 356 B of 12 KB; the AVR edition's lesson 24 arcade used 1 372 B of 4 KB.
 
@@ -60,6 +60,11 @@ fill the window with the rest of the board out of sight: arrows = stick,
 real time, **30 % at boot** — by running each 20 ms game tick every 20, 25, 33,
 50, 66 or 100 ms of real time (`Main.c`); no game file changes, physics
 included. At full speed the games were too fast to follow in the simulator.
+**Halved speeds (2026-11-03):** for the same reason every game object now
+moves at half its old speed at every SPEED level - SNAKE 16 .. 8 ticks per
+move (was 8 .. 4), BREAKOUT's ball 0.5 .. 0.8 px per tick (was 1.0 .. 1.6;
+the paddle is unchanged), FLAP on half the time scale (gravity, flap, scroll
+and terminal velocity) - and every host figure below was re-measured.
 Type `quiet` + Enter to stop the `$PERF` line, `loud` + Enter to restart it.
 Use the Wokwi VS Code extension's serial terminal, which sends each key as
 it is pressed (lesson 08 saw arrows arrive through it). A terminal never says
@@ -104,23 +109,23 @@ pass; exits non-zero on any failure.**
 
 | Test | Measured on the host |
 |---|---|
-| SNAKE autopilot, level 3 | 42 apples in 58.7 s, length 87 = 3 + 2 × 42, score 126 = 3 × 42 |
-| SNAKE, no input | hits the wall on tick **126** = predicted 21 moves × 6 ticks |
-| determinism | same seed + inputs → same 2 934 ticks, score, framebuffer hash; other seed → different |
-| BREAKOUT autopilot, level 3 | 5 min: 188 bricks, 3 waves, score 1 395, no ball lost |
-| BREAKOUT, no input | auto-serves after 3 s, three misses, game over on tick 599 |
-| FLAP autopilot, level 3 | 97 pipes in 71.3 s |
-| FLAP, no input | hovers to tick 150, lands on tick **171** = predicted 149 + 22 |
+| SNAKE autopilot, level 3 | 42 apples in 152.8 s, length 87 = 3 + 2 × 42, score 126 = 3 × 42 |
+| SNAKE, no input | hits the wall on tick **252** = predicted 21 moves × 12 ticks |
+| determinism | same seed + inputs → same 7 642 ticks, score, framebuffer hash; other seed → different |
+| BREAKOUT autopilot, level 3 | 5 min: 87 bricks, 1 wave, score 648, no ball lost |
+| BREAKOUT, no input | auto-serves after 3 s, three misses, game over on tick 746 |
+| FLAP autopilot, level 3 | 75 pipes in 115.9 s |
+| FLAP, no input | hovers to tick 150, lands on tick **193** = predicted 149 + 44 |
 | `oled_init()` | 32 transfers, 1 161 bytes |
-| bus per frame, dirty pages | SNAKE 129 B / 2.92 ms (worst 18.7 ms), BREAKOUT 220 B / 4.96 ms, FLAP 935 B / 21.11 ms |
+| bus per frame, dirty pages | SNAKE 50 B / 1.12 ms (worst 18.7 ms), BREAKOUT 150 B / 3.38 ms, FLAP 669 B / 15.10 ms (51 % of frames over 20 ms) |
 | bus per frame, full repaint | 1 104 B / **24.92 ms** — over the 20 ms tick |
-| SNAKE drawn clear-and-redraw (Lab Part 3) | 970 B / frame — the dirty-page check fails, as it should |
-| loop vs a simulated clock | 50 updates/s in every case; fps 50 (SNAKE, BREAKOUT dirty), 46.8 (FLAP dirty), 40.1 (any full repaint) |
+| SNAKE drawn clear-and-redraw (Lab Part 3) | 968 B / frame — the dirty-page check fails, as it should |
+| loop vs a simulated clock | 50 updates/s in every case; fps 50 (every game, dirty pages), 40.1 (any full repaint) |
 | arcade | menu navigation, A to play, game over reported once, `$SCORE,SNAKE,172*2E` passes `proto_check()`, high score kept, an edited score (`*2A`) rejected |
 | keyboard (`kbd.c`) | `ESC [ A` = stick up for 150 ms, held by 30 Hz auto-repeat; the last arrow wins; `a` is one press; `quiet`/`loud` + Enter press nothing; Backspace edits; `4` = knob 700 until the real knob turns; `-` slower, `+`/`=` faster; one Up tap + `a` starts FLAP |
 | station keys (`$KEY`) | down holds until up (no 150 ms guess); a key never renewed lets go after 600 ms; a repeat renews without re-pressing; bad checksum ignored; a `$KEY` line also works arriving byte by byte |
 | OLED mirror (`mirror.c`) | silent until `$MIRROR,1`; then the whole screen once, 32 frames of ≤ 77 B, all checksummed; then only what changes (one pixel = one segment); one unchanged segment re-sent every 100 ms; stops 3 s after the last `$MIRROR,1`. A full screen costs 2 464 B = 214 ms at 115 200 baud |
-| `--playtest`, FLAP pipes at levels 1–5 | 135, 93, 63, 15, 4 — a cliff between 3 and 4 (Lab Part 6) |
+| `--playtest`, FLAP pipes at levels 1–5 | 121.7, 65.3, 43.0, 31.3, 1.7 — a cliff between 4 and 5 (Lab Part 6) |
 
 **Two bugs the host test found in this lesson's own first draft**, both fixed
 and both now taught:
@@ -297,7 +302,7 @@ The menu:
 
 ## Status
 
-**Builds with zero warnings** (FLASH 19 276 B, RAM 4 896 B). **The host test
+**Builds with zero warnings** (FLASH 19 304 B, RAM 4 896 B). **The host test
 passes all 45 checks** with the numbers above. Not run on silicon or in Renode.
 
 **Watched running in Wokwi on 2026-11-01**: the menu shows, A starts a game,

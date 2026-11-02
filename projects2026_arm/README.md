@@ -372,7 +372,7 @@ every host test passes:
 |---|---|---|
 | 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
 | 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
-| 12 | 19 276 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 129 bus bytes a frame against 1104 for a full repaint |
+| 12 | 19 304 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 50 bus bytes a frame against 1104 for a full repaint (games at half speed since 2026-11-03) |
 | 13 | 28 524 / 11 120 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
 | 14 | 29 600 / 10 776 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
 | 15 | 29 484 / 9 744 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |

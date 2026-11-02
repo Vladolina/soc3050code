@@ -232,9 +232,14 @@ static void serial_init(void)
     NVIC_EnableIRQ(USART2_IRQn);
 }
 
-/* The OLED mirror: after each flush, as many $FB frames as fit, at most 2 a
- * pass so the loop is never held up.  The station asks for them; a terminal
- * never sees one. */
+/* The OLED mirror: up to 2 $FB frames a call, only while they fit, so the
+ * loop is never held up.  Called after each flush AND over and over while the
+ * loop waits for its next tick - that idle time is what keeps the station's
+ * copy current.  At 2 frames per flush alone, a game at 30 % pace (15 frames
+ * a second) sent 30 of the screen's 32 segments a second, and FLAP's picture
+ * on the PC trailed the real one by up to a second.  The link carries ~150
+ * segments a second; the idle loop uses it.  The station asks for frames; a
+ * terminal never sees one. */
 static void mirror_poll(void)
 {
     char frame[MIRROR_FRAME_MAX];
@@ -335,13 +340,14 @@ int main(void)
                 break;                            /* spiral into catching up    */
             }
         }
-        if (ran == 0) {               /* nothing due: sleep until the next tick */
+        if (ran == 0) {               /* nothing due: idle until the next tick */
 #if SLEEP_WFI
+            mirror_poll();            /* the UART's interrupt wakes WFI too    */
             __WFI();
 #else
             uint32_t m = ms;
-            while (ms == m) { }       /* Wokwi: spin to the tick (see SLEEP_WFI) */
-#endif
+            while (ms == m) { mirror_poll(); }   /* Wokwi: spin to the tick,  */
+#endif                                          /* feeding the mirror        */
             continue;
         }
 

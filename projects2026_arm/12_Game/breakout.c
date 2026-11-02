@@ -58,7 +58,8 @@ static void breakout_start(int lvl)
     pw = 22 - 2 * lvl;                  /* 20 px at level 1 .. 12 at level 5 */
     px = (OLED_W - pw) / 2;
     pxf = (int32_t)px << FP;
-    speed = 256 + 40 * (lvl - 1);       /* 1.0 .. 1.6 px per tick            */
+    speed = 128 + 20 * (lvl - 1);       /* 0.5 .. 0.8 px per tick (halved    */
+                                        /* 2026-11-03: too fast to follow)   */
     fill_wall();
     serve();
     n_broken = 0;  need_full = 1;
@@ -131,7 +132,7 @@ bricks_done:
 
     if ((rows[0] | rows[1] | rows[2] | rows[3]) == 0) {      /* wave cleared  */
         wave++;
-        speed += 24;
+        speed += 12;
         if (speed > 3 * 256 - 64) { speed = 3 * 256 - 64; }   /* < 3 px: no tunnelling */
         fill_wall();
         serve();
