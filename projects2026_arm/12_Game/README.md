@@ -112,6 +112,30 @@ Each task was built and run on the host on 2026-11-03: every one builds with
 zero warnings. Some make a host check fail and some make the screen wrong
 while every check passes - which is which is part of the task.
 
+### Answers - read them after you have written your prediction
+
+Measured on the host (`host/run.sh`, the real game code), each change applied
+alone and then undone. Without any change: SNAKE 42 apples in 152.8 s;
+BREAKOUT 87 bricks, 1 wave, score 648 in 5 minutes; FLAP 75 pipes in 115.9 s;
+45 of 45 checks pass.
+
+| Task | What happens | Why, in one sentence | Host test |
+|---|---|---|---|
+| **T1** | Easier: the autopilot breaks 92 bricks (was 87), score 684. The ball still leaves the paddle within the same range of angles, but a hit at a given distance from the centre now sends it out at a gentler angle. | `vx = off * speed * 2 / pw` in `breakout_step()`: the angle depends on where the ball hits *relative to* the paddle's width. | passes |
+| **T2** | With 14 columns, brick 14 sits at x = 4 + 13 x 10 = 134 px, entirely off the 128-px screen. The ball can never reach it, so **no wave is ever cleared** (0 waves in 5 minutes). With 13, the last brick is at x = 124..132: half visible, still hittable, and waves clear. | Nothing checks that the layout fits the screen; `rows[]` is `uint16_t`, so up to 16 columns compile without a word. | passes - the test cannot see it |
+| **T3** | The bricks reach y = 13 + 8 x 5 = 53, only 7 px above the paddle at y = 60. The autopilot breaks 228 bricks in 2 waves, score 3 000. With no input the game ends sooner (tick 610, was 746) - probably because the served ball meets a brick almost at once and comes straight back (not traced). | Each row pays `(ROWS - r) * level`, so the top row is now worth 8 x level. | passes |
+| **T4** | The game works: five balls. | The host check *"3 balls lost, game over on tick 746"* fails (now 1364). **The test wrote down a design decision**, so it must change with the design. Is a test that pins a constant a good test? | **1 check fails** |
+| **T5** | Gaps of 34..26 px instead of 26..18. The autopilot is still flying when its 2-minute run ends (76 pipes). Run `--playtest` yourself for where the cliff moves. | A wider gap gives every level 8 px more room for error. | passes |
+| **T6** | Floaty - and the autopilot cannot play it: 0 pipes, crashed after 4.2 s and 3 flaps. With no input the bird lands on tick 217 (was 193). | A flap's peak is v^2 / 2g = 200^2 / (2 x 3) / 256 = about 26 px, against about 11 px at gravity 7: one flap now lifts the bird 2.3 times higher, into the ceiling or over the gap. | **2 checks fail** |
+| **T7** | The grid is still 31 x 13 cells, but now 155 x 65 px: the snake runs off the right and bottom of the screen, the right border is drawn in the wrong place, and apples can appear where nobody can see them. | `GW` and `GH` are cell counts chosen for 4-px cells; nothing derives them from the screen. To try: compute them from `OLED_W`, `OLED_H` and `CELL`. | **passes** - the test plays in cells and never looks at the screen |
+| **T8** | Each apple plays your tune, e.g. `{523, 80}, {659, 80}, {784, 160}` = C, E, G. `{0, 0}` ends the effect; `{0, ms}` is a rest. Flash grows by 4 bytes. | `sound_poll()` in `Main.c` starts the next note when the last one has ended; `beep()` and TIM3 do the rest. | passes |
+| **T9** | Full speed: `$PERF` reads about 50 fps and 50 updates/s (was about 15 at 30 %). Much harder. | The games count ticks; the pace only decides how much real time a tick gets - game time is not wall time. | passes - the host test counts ticks |
+| **T10** | `$SCORE,BREAKOUT,6480*CS` - ten times larger - and lesson 08's `proto_check()` still accepts it. | The board computes the checksum over whatever it sends: a checksum proves a line arrived intact, not that the score is honest. | passes |
+
+Worth comparing side by side: **T4 and T7** - a test that fails on a game that
+works, and a test that passes on a game that is broken. And **T2 with 13 and
+then 14 columns**.
+
 ## Facts checked against sources, not memory
 
 | Fact | Source |
