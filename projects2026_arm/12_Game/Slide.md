@@ -437,6 +437,131 @@ Not rows of pixels, as on a PC — **vertical strips of eight**. That one fact
 shapes everything below: the unit of transfer is a byte that is a column, and
 the natural unit of "this part changed" is a **page**, 8 rows deep.
 
+The MCU keeps a copy of that RAM, `fb`, laid out so each row of the array
+**is** one page of the glass — `oled.c` writes row *p* out as page *p*, unchanged:
+
+```svg
+<svg viewBox="0 0 730 252" role="img" aria-label="The framebuffer fb[8][1+128] in STM32 RAM mapped onto the 128 by 64 screen: row p of the array is page p of the glass, byte fb[p][1+x] is column x of that page, and fb[p][0] is the 0x40 control byte that never reaches the glass">
+  <defs><marker id="ar12" markerWidth="7" markerHeight="7" refX="6.2" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.4 0.7 L6.2 3 L0.4 5.3 z" fill="currentColor"/></marker></defs>
+  <text x="20" y="14" class="mono">uint8_t fb[8][1 + 128]</text><text x="200" y="14" class="lbl">in STM32 RAM</text>
+  <text x="340" y="14">The glass, 128 × 64</text><text x="472" y="14" class="lbl">(drawn 2 px per pixel)</text>
+  <text x="84" y="42" text-anchor="middle" class="mono lbl">[0]</text>
+  <text x="116" y="42" text-anchor="middle" class="mono lbl">[1]</text>
+  <text x="144" y="42" text-anchor="middle" class="mono lbl">[2]</text>
+  <text x="192" y="42" text-anchor="middle" class="mono lbl">[41]</text>
+  <text x="242" y="42" text-anchor="middle" class="mono lbl">[128]</text>
+  <text x="20" y="60" class="mono lbl">fb[0]</text>
+  <rect class="reg" x="66" y="52" width="36" height="16"/>
+  <rect class="reg" x="102" y="52" width="28" height="16"/>
+  <rect class="reg" x="130" y="52" width="28" height="16"/>
+  <rect class="reg" x="178" y="52" width="28" height="16"/>
+  <rect class="reg" x="226" y="52" width="32" height="16"/>
+  <text x="84" y="60" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="60" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="60" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 60 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="60" class="mono lbl">page 0  y 0–7</text>
+  <text x="20" y="76" class="mono lbl">fb[1]</text>
+  <rect class="reg" x="66" y="68" width="36" height="16"/>
+  <rect class="reg" x="102" y="68" width="28" height="16"/>
+  <rect class="reg" x="130" y="68" width="28" height="16"/>
+  <rect class="hifill" x="178" y="68" width="28" height="16"/>
+  <rect class="reg" x="226" y="68" width="32" height="16"/>
+  <text x="84" y="76" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="76" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="76" text-anchor="middle" class="lbl">…</text>
+  <path class="hi" d="M264 76 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="76" class="mono lbl">page 1  y 8–15</text>
+  <text x="20" y="92" class="mono lbl">fb[2]</text>
+  <rect class="reg" x="66" y="84" width="36" height="16"/>
+  <rect class="reg" x="102" y="84" width="28" height="16"/>
+  <rect class="reg" x="130" y="84" width="28" height="16"/>
+  <rect class="reg" x="178" y="84" width="28" height="16"/>
+  <rect class="reg" x="226" y="84" width="32" height="16"/>
+  <text x="84" y="92" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="92" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="92" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 92 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="92" class="mono lbl">page 2  y 16–23</text>
+  <text x="20" y="108" class="mono lbl">fb[3]</text>
+  <rect class="reg" x="66" y="100" width="36" height="16"/>
+  <rect class="reg" x="102" y="100" width="28" height="16"/>
+  <rect class="reg" x="130" y="100" width="28" height="16"/>
+  <rect class="reg" x="178" y="100" width="28" height="16"/>
+  <rect class="reg" x="226" y="100" width="32" height="16"/>
+  <text x="84" y="108" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="108" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="108" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 108 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="108" class="mono lbl">page 3  y 24–31</text>
+  <text x="20" y="124" class="mono lbl">fb[4]</text>
+  <rect class="reg" x="66" y="116" width="36" height="16"/>
+  <rect class="reg" x="102" y="116" width="28" height="16"/>
+  <rect class="reg" x="130" y="116" width="28" height="16"/>
+  <rect class="reg" x="178" y="116" width="28" height="16"/>
+  <rect class="reg" x="226" y="116" width="32" height="16"/>
+  <text x="84" y="124" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="124" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="124" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 124 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="124" class="mono lbl">page 4  y 32–39</text>
+  <text x="20" y="140" class="mono lbl">fb[5]</text>
+  <rect class="reg" x="66" y="132" width="36" height="16"/>
+  <rect class="reg" x="102" y="132" width="28" height="16"/>
+  <rect class="reg" x="130" y="132" width="28" height="16"/>
+  <rect class="reg" x="178" y="132" width="28" height="16"/>
+  <rect class="reg" x="226" y="132" width="32" height="16"/>
+  <text x="84" y="140" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="140" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="140" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 140 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="140" class="mono lbl">page 5  y 40–47</text>
+  <text x="20" y="156" class="mono lbl">fb[6]</text>
+  <rect class="reg" x="66" y="148" width="36" height="16"/>
+  <rect class="reg" x="102" y="148" width="28" height="16"/>
+  <rect class="reg" x="130" y="148" width="28" height="16"/>
+  <rect class="reg" x="178" y="148" width="28" height="16"/>
+  <rect class="reg" x="226" y="148" width="32" height="16"/>
+  <text x="84" y="156" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="156" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="156" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 156 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="156" class="mono lbl">page 6  y 48–55</text>
+  <text x="20" y="172" class="mono lbl">fb[7]</text>
+  <rect class="reg" x="66" y="164" width="36" height="16"/>
+  <rect class="reg" x="102" y="164" width="28" height="16"/>
+  <rect class="reg" x="130" y="164" width="28" height="16"/>
+  <rect class="reg" x="178" y="164" width="28" height="16"/>
+  <rect class="reg" x="226" y="164" width="32" height="16"/>
+  <text x="84" y="172" text-anchor="middle" class="mono lbl">0x40</text>
+  <text x="168" y="172" text-anchor="middle" class="lbl">…</text>
+  <text x="216" y="172" text-anchor="middle" class="lbl">…</text>
+  <path class="wire" d="M264 172 H334" marker-end="url(#ar12)"/>
+  <text x="606" y="172" class="mono lbl">page 7  y 56–63</text>
+  <text x="84" y="190" text-anchor="middle" class="mono lbl">ctrl</text>
+  <text x="116" y="190" text-anchor="middle" class="mono lbl">x=0</text>
+  <text x="144" y="190" text-anchor="middle" class="mono lbl">x=1</text>
+  <text x="192" y="190" text-anchor="middle" class="mono lbl">x=40</text>
+  <text x="242" y="190" text-anchor="middle" class="mono lbl">x=127</text>
+  <text x="340" y="42" class="mono lbl">x=0</text>
+  <text x="596" y="42" text-anchor="end" class="mono lbl">x=127</text>
+  <rect class="box" x="340" y="52" width="256" height="128"/>
+  <path class="dash" d="M340 68 H596"/>
+  <path class="dash" d="M340 84 H596"/>
+  <path class="dash" d="M340 100 H596"/>
+  <path class="dash" d="M340 116 H596"/>
+  <path class="dash" d="M340 132 H596"/>
+  <path class="dash" d="M340 148 H596"/>
+  <path class="dash" d="M340 164 H596"/>
+  <rect class="hifill" x="420" y="68" width="2" height="16"/>
+  <path class="dash" d="M421 84 V186"/>
+  <text x="421" y="194" text-anchor="middle" class="mono lbl">fb[1][41] → x 40, y 8–15</text>
+  <text x="20" y="220" class="lbl">Row p of the array is page p of the glass: byte fb[p][1 + x] is column x, 8 pixels, bit 0 on top (y = 8p).</text>
+  <text x="20" y="238" class="lbl">fb[p][0] is always 0x40, the control byte (slide 5b): it goes out on the wire ahead of the page and is never drawn.</text>
+</svg>
+```
+
 ---
 
 ## Slide 3b: I²C — Two Wires, One Byte at a Time
@@ -853,7 +978,7 @@ Lab Part 2 measures the same thing on the board: press the stick to switch
   <path class="hi" d="M40 50 V70 M140 50 V70 M240 50 V70 M340 50 V70 M440 50 V70 M540 50 V70"/>
   <text x="40" y="44" text-anchor="middle" class="mono lbl">0</text>
   <text x="140" y="44" text-anchor="middle" class="mono lbl">20</text>
-  <text x="240" y="44" text-anchor="middle" class="mono lbl">40</text>
+  <text x="240" y="44" text-anchor="middle" class="mono lbl">0x40</text>
   <text x="340" y="44" text-anchor="middle" class="mono lbl">60</text>
   <text x="440" y="44" text-anchor="middle" class="mono lbl">80</text>
   <text x="540" y="44" text-anchor="middle" class="mono lbl">100 ms</text>
