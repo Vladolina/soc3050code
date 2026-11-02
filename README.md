@@ -37,7 +37,15 @@ and the clone is unusable. If you must clone deep, enable long paths first:
 git config --global core.longpaths true
 ```
 
-Nothing else needs installing: both compilers and SimulIDE are in `tools/`.
+Nothing else needs installing to build: both compilers and SimulIDE are in
+`tools/`. Two things are not in the repository, for the ARM lessons only:
+
+- the **Wokwi** VS Code extension, which simulates them - VS Code offers it
+  when you open the folder, and it asks you to activate a licence once;
+- **Python 3** for the station (**Terminal → Run Task → ARM: Station**: the
+  board's screen and keyboard on the PC) - from https://www.python.org/downloads/,
+  which includes the tkinter it needs. The task finds `py` or `python` itself
+  and says so plainly if neither works; the serial library is in `tools/pylib/`.
 
 Then open any file under `projects2026_avr/01_Port_Basic/` and press
 **Ctrl+Shift+B** to build, or run **Terminal → Run Task → Simulate Current

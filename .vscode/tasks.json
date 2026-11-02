@@ -111,9 +111,12 @@
             "label": "ARM: Station",
             "detail": "The board's OLED, keyboard and telemetry on the PC (lessons 12-19); start the Wokwi simulation too",
             "type": "shell",
-            "command": "python",
+            "command": "powershell.exe",
             "args": [
-                "${workspaceFolder}\\tools\\station\\station.py"
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}\\tools\\cli\\station.ps1"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
