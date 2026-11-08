@@ -49,6 +49,8 @@ class View:
     title = "view"
     frames = ()
     help = ""            # one line shown under the picture: what to press, what to look at
+    layout = "oled"      # "oled": the OLED large above the view (the game IS the OLED)
+                         # "view": this view gets the whole left side, the OLED goes small
 
     def __init__(self, canvas, station):
         self.c = canvas
@@ -62,8 +64,17 @@ class View:
     def frame(self, name, fields, t):
         pass
 
+    def text(self, line):
+        """A line the board printed that is not a $ frame ("failsafe: ...")."""
+
     def draw(self):
         pass
+
+    def fnt(self, size, bold=False):
+        """A font that grows with the picture, so a projector can read it:
+        `size` is in points at a 1100 x 700 canvas."""
+        k = max(0.8, min(2.4, min(self.w / 1100.0, self.h / 700.0)))
+        return ("Consolas", max(8, int(size * k)), "bold") if bold else ("Consolas", max(8, int(size * k)))
 
 
 class Strip:
@@ -91,10 +102,10 @@ class Strip:
         q = self.data.get(name)
         return q[-1][1] if q else None
 
-    def draw(self, c, x, y, w, h, title=""):
+    def draw(self, c, x, y, w, h, title="", font=FONT, width=2):
         c.create_rectangle(x, y, x + w, y + h, outline=GRID)
         now = time.monotonic()
-        vals = [v for q in self.data.values() for _, v in q]
+        vals = [v for q in self.data.values() for t, v in q if now - t <= self.span]
         lo = self.lo if self.lo is not None else (min(vals) if vals else 0.0)
         hi = self.hi if self.hi is not None else (max(vals) if vals else 1.0)
         if hi - lo < 1e-9:
@@ -104,21 +115,24 @@ class Strip:
         if lo < 0 < hi:                               # the zero line
             zy = y + h - (0 - lo) / (hi - lo) * h
             c.create_line(x, zy, x + w, zy, fill=GRID, dash=(2, 3))
-        c.create_text(x + 4, y + 2, anchor="nw", text=f"{hi:.4g}{self.unit}", fill=DIM, font=FONT)
-        c.create_text(x + 4, y + h - 2, anchor="sw", text=f"{lo:.4g}{self.unit}", fill=DIM, font=FONT)
+        c.create_text(x + 4, y + 2, anchor="nw", text=f"{hi:.4g}{self.unit}", fill=DIM, font=font)
+        c.create_text(x + 4, y + h - 2, anchor="sw", text=f"{lo:.4g}{self.unit}", fill=DIM, font=font)
         if title:
-            c.create_text(x + w / 2, y + 2, anchor="n", text=title, fill=FG, font=FONT)
+            c.create_text(x + w / 2, y + 2, anchor="n", text=title, fill=FG, font=font)
         lx = x + w - 6
         for i, n in enumerate(self.names):
             q = self.data[n]
             col = COLOURS[i % len(COLOURS)]
             pts = []
             for t, v in q:
+                if now - t > self.span:            # older than the window: off the left edge
+                    continue
                 pts += [x + w - (now - t) / self.span * w, y + h - (v - lo) / (hi - lo) * h]
             if len(pts) >= 4:
-                c.create_line(*pts, fill=col, width=2)
+                c.create_line(*pts, fill=col, width=width)
             last = f" {q[-1][1]:.4g}" if q else ""
-            item = c.create_text(lx, y + h - 4 - 14 * i, anchor="se", text=f"{n}{last}", fill=col, font=FONT)
+            step = int(font[1] * 1.6) if isinstance(font, tuple) else 14
+            item = c.create_text(lx, y + h - 4 - step * i, anchor="se", text=f"{n}{last}", fill=col, font=font)
             del item
 
 

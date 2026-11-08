@@ -1,8 +1,19 @@
 """
-l13_attitude.py - lesson 13, the drone on a gimbal.  An artificial horizon the
-size of the window: what the controller BELIEVES (the filled sky and ground),
-what the world really did (dashed white), and what the pilot asked for
-(dotted magenta), with the four motors and strip charts beside it.
+l13_attitude.py - lesson 13, the drone on a gimbal, drawn for a projector.
+
+The view takes the whole left side of the station (layout = "view"; the
+OLED goes small, top right):
+
+  - a status bar: SIM or MPU, ARMED / disarmed in a coloured chip, the gain;
+  - an artificial horizon as tall as the window - what the controller
+    BELIEVES (the filled sky and ground), what the world really did (dashed
+    white), what the pilot asked for (dotted magenta) - with roll and pitch
+    printed large on it;
+  - the quad from above, each motor where it sits on the frame, filled by
+    its thrust;
+  - strip charts of roll, pitch and estimate - truth;
+  - the board's events ("failsafe: ...", "CRASH ...") as a banner;
+  - the keys, along the bottom.
 
     $ATT,<ms>,<roll>,<pitch>,<roll_sp>,<pitch_sp>,<roll_true>,<pitch_true>,
          <m0>,<m1>,<m2>,<m3>,<armed>,<kp x100>               SIM mode, 25 Hz
@@ -16,7 +27,7 @@ down, pitch > 0 = nose up.  Motors: M0 FL, M1 FR, M2 RR, M3 RL.
 import math
 import time
 
-from .base import BG, COLOURS, DIM, FG, FONT, FONT_BIG, GRID, Strip, View, num
+from .base import BG, COLOURS, DIM, FG, GRID, Strip, View, num
 
 SKY = "#2a5f8f"
 GROUND = "#7a5532"
@@ -24,7 +35,12 @@ TRUE_COL = "#ffffff"
 SP_COL = "#ff6ad5"
 ACC_COL = "#e6db74"
 PLANE = "#ffd700"
+OK_COL = "#2e7d32"
+OFF_COL = "#455a64"
+MPU_COL = "#9e7d00"
+ALARM = "#c62828"
 MOTOR_NAMES = ("M0 FL", "M1 FR", "M2 RR", "M3 RL")
+BANNER_S = 4.0                       # how long a board event stays on screen
 
 
 def _fin(v):
@@ -64,8 +80,11 @@ class Attitude(View):
     name = "attitude"
     title = "Lesson 13 - drone attitude"
     frames = ("ATT", "EST")
+    layout = "view"
     help = ("arrows = stick, a = arm, b = gust, s = SIM/MPU, 1-5 = Kp;  "
             "type kick, hold, alpha 980, aw 0, mix -1, quiet / loud")
+    KEYS = (("arrows", "tilt"), ("a", "arm / disarm"), ("b", "gust"),
+            ("s", "SIM / MPU"), ("1-5", "Kp"), ("?", "keys"))
 
     SPAN = 15.0
 
@@ -81,14 +100,14 @@ class Attitude(View):
         self.armed = None
         self.kp = None
         self.board_ms = None
-        self.roll_s = Strip(["est", "true", "sp"], span=self.SPAN, unit=" deg")
-        self.pitch_s = Strip(["est", "true", "sp"], span=self.SPAN, unit=" deg")
-        self.err_s = Strip(["roll err", "pitch err"], span=self.SPAN, unit=" deg")
-        self.mot_s = Strip(list(MOTOR_NAMES), span=self.SPAN, lo=0, hi=100, unit=" %")
-        self.eroll_s = Strip(["est", "accel"], span=self.SPAN, unit=" deg")
-        self.epitch_s = Strip(["est", "accel"], span=self.SPAN, unit=" deg")
+        self.banner = None                   # (text, colour, until)
+        self.roll_s = Strip(["est", "true", "sp"], span=self.SPAN, unit="°")
+        self.pitch_s = Strip(["est", "true", "sp"], span=self.SPAN, unit="°")
+        self.err_s = Strip(["roll", "pitch"], span=self.SPAN, unit="°")
+        self.eroll_s = Strip(["accel", "est"], span=self.SPAN, unit="°")
+        self.epitch_s = Strip(["accel", "est"], span=self.SPAN, unit="°")
 
-    # ---- frames ------------------------------------------------------------
+    # ---- what the board sends ----------------------------------------------
     def frame(self, name, f, t):
         if name == "ATT" and len(f) >= 13:
             v = [num(x) for x in f[:13]]
@@ -103,8 +122,7 @@ class Attitude(View):
             self.armed, self.kp = bool(v[11]), v[12] / 100.0
             self.roll_s.add(t, est=r, true=rt, sp=rs)
             self.pitch_s.add(t, est=p, true=pt, sp=ps)
-            self.err_s.add(t, **{"roll err": r - rt, "pitch err": p - pt})
-            self.mot_s.add(t, **dict(zip(MOTOR_NAMES, self.motors)))
+            self.err_s.add(t, roll=r - rt, pitch=p - pt)
         elif name == "EST" and len(f) >= 5:
             v = [num(x) for x in f[:5]]
             if not all(_fin(x) for x in v):
@@ -116,6 +134,14 @@ class Attitude(View):
             self.acc, self.true, self.sp, self.motors = (ra, pa), None, None, None
             self.eroll_s.add(t, est=r, accel=ra)
             self.epitch_s.add(t, est=p, accel=pa)
+
+    def text(self, line):
+        """The board's own words, large: failsafes and crashes in red."""
+        s = line.strip()
+        if s.startswith("failsafe:") or s.startswith("CRASH"):
+            self.banner = (s, ALARM, time.monotonic() + BANNER_S)
+        elif s.startswith("mode:"):
+            self.banner = (s, MPU_COL, time.monotonic() + BANNER_S)
 
     # ---- the horizon -------------------------------------------------------
     def _line(self, cx, cy, half, k, roll, pitch, **kw):
@@ -141,127 +167,185 @@ class Attitude(View):
         ground = _clip_poly(box, nx, ny, nx * cx + ny * cy + d)
         if len(ground) >= 3:
             c.create_polygon(*[v for pt in ground for v in pt], fill=GROUND, outline="")
-        self._line(cx, cy, half, k, self.roll, self.pitch, fill=FG, width=2)
+        lw = max(2, int(s / 250))
+        self._line(cx, cy, half, k, self.roll, self.pitch, fill=FG, width=lw + 1)
 
         # pitch ladder on the estimate, every 10 degrees
+        f_small = self.fnt(11)
         for lad in (-30, -20, -10, 10, 20, 30):
             dd = (self.pitch - lad) * k
             px, py = cx + nx * dd, cy + ny * dd
             L = s * (0.10 if lad % 20 else 0.16)
             ex, ey = math.cos(a) * L, -math.sin(a) * L
             if abs(px - cx) < half - 4 and abs(py - cy) < half - 4:
-                c.create_line(px - ex, py - ey, px + ex, py + ey, fill=FG)
-                c.create_text(px + ex * 1.3, py + ey * 1.3, text=str(abs(lad)), fill=FG, font=FONT)
+                c.create_line(px - ex, py - ey, px + ex, py + ey, fill=FG, width=lw)
+                c.create_text(px + ex * 1.35, py + ey * 1.35, text=str(abs(lad)), fill=FG, font=f_small)
 
         # roll scale: ticks that turn with the horizon, a fixed pointer
         r = half * 0.86
         for tick in (-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60):
             ang = math.radians(tick - self.roll)
-            ln = 14 if tick % 30 == 0 else 8
+            ln = s * (0.035 if tick % 30 == 0 else 0.02)
             x1, y1 = cx + r * math.sin(ang), cy - r * math.cos(ang)
             x2, y2 = cx + (r - ln) * math.sin(ang), cy - (r - ln) * math.cos(ang)
-            c.create_line(x1, y1, x2, y2, fill=FG, width=2)
-        c.create_polygon(cx, cy - r + 16, cx - 8, cy - r + 30, cx + 8, cy - r + 30, fill=PLANE)
+            c.create_line(x1, y1, x2, y2, fill=FG, width=lw)
+        tp = s * 0.04
+        c.create_polygon(cx, cy - r + tp * 0.5, cx - tp * 0.5, cy - r + tp * 1.4, cx + tp * 0.5, cy - r + tp * 1.4,
+                         fill=PLANE)
 
         # the other opinions
         if self.true:
-            self._line(cx, cy, half, k, *self.true, fill=TRUE_COL, width=2, dash=(10, 6))
+            self._line(cx, cy, half, k, *self.true, fill=TRUE_COL, width=lw, dash=(12, 8))
         if self.sp:
-            self._line(cx, cy, half, k, *self.sp, fill=SP_COL, width=2, dash=(2, 5))
+            self._line(cx, cy, half, k, *self.sp, fill=SP_COL, width=lw + 1, dash=(3, 6))
         if self.acc:
-            self._line(cx, cy, half, k, *self.acc, fill=ACC_COL, width=2, dash=(10, 6))
+            self._line(cx, cy, half, k, *self.acc, fill=ACC_COL, width=lw, dash=(12, 8))
 
         # the aircraft, fixed in the middle
         wgt = s * 0.17
-        c.create_line(cx - 2 * wgt, cy, cx - wgt * 0.6, cy, cx - wgt * 0.3, cy + wgt * 0.25, fill=PLANE, width=4)
-        c.create_line(cx + 2 * wgt, cy, cx + wgt * 0.6, cy, cx + wgt * 0.3, cy + wgt * 0.25, fill=PLANE, width=4)
-        c.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill=PLANE, outline="")
+        pw = max(4, int(s / 140))
+        c.create_line(cx - 2 * wgt, cy, cx - wgt * 0.6, cy, cx - wgt * 0.3, cy + wgt * 0.25, fill=PLANE, width=pw)
+        c.create_line(cx + 2 * wgt, cy, cx + wgt * 0.6, cy, cx + wgt * 0.3, cy + wgt * 0.25, fill=PLANE, width=pw)
+        c.create_oval(cx - pw, cy - pw, cx + pw, cy + pw, fill=PLANE, outline="")
         c.create_rectangle(cx - half, cy - half, cx + half, cy + half, outline=DIM, width=2)
 
-        # legend
+        # roll and pitch, large, in the top corners of the instrument
+        big, mid = self.fnt(30, bold=True), self.fnt(13)
+        pad = s * 0.03
+        for corner, label, est, tru in (("w", "ROLL", self.roll, self.true and self.true[0]),
+                                        ("e", "PITCH", self.pitch, self.true and self.true[1])):
+            tx = x + pad if corner == "w" else x + s - pad
+            anchor = "n" + corner
+            c.create_text(tx, y + pad, anchor=anchor, text=label, fill=FG, font=mid)
+            c.create_text(tx, y + pad + mid[1] * 1.7, anchor=anchor, text=f"{est:+.1f}°", fill=FG, font=big)
+            if tru is not None:
+                c.create_text(tx, y + pad + mid[1] * 1.7 + big[1] * 1.7, anchor=anchor,
+                              text=f"true {tru:+.1f}°", fill=TRUE_COL, font=mid)
+
+        # legend, bottom of the instrument
         items = [("estimate", FG, None)]
         if self.true:
-            items.append(("true", TRUE_COL, (10, 6)))
+            items.append(("true", TRUE_COL, (12, 8)))
         if self.sp:
-            items.append(("setpoint", SP_COL, (2, 5)))
+            items.append(("your stick", SP_COL, (3, 6)))
         if self.acc:
-            items.append(("accel only", ACC_COL, (10, 6)))
-        lx = x + 8
+            items.append(("accel only", ACC_COL, (12, 8)))
+        f_leg = self.fnt(12)
+        cw = f_leg[1] * 0.85                         # roughly one character, px
+        lx, ly = x + pad, y + s - pad - f_leg[1]
         for label, col, dash in items:
-            ly = y + s - 14
-            c.create_rectangle(lx - 3, ly - 9, lx + 26 + 8 * len(label), ly + 9, fill=BG, outline="")
-            c.create_line(lx, ly, lx + 20, ly, fill=col, width=2, dash=dash or ())
-            c.create_text(lx + 24, ly, anchor="w", text=label, fill=col, font=FONT)
-            lx += 34 + 8 * len(label)
+            wtxt = cw * len(label)
+            c.create_rectangle(lx - 4, ly - f_leg[1], lx + 36 + wtxt + 8, ly + f_leg[1], fill=BG, outline="")
+            c.create_line(lx, ly, lx + 30, ly, fill=col, width=lw + 1, dash=dash or ())
+            c.create_text(lx + 36, ly, anchor="w", text=label, fill=col, font=f_leg)
+            lx += 36 + wtxt + 26
 
-    # ---- the motors --------------------------------------------------------
-    def _motors(self, x, y, w, h):
+    # ---- the quad from above ------------------------------------------------
+    def _quad(self, x, y, w, h):
+        """The X-quad seen from above, nose up: each motor where it sits on the
+        frame, its disc filled by its thrust."""
         c = self.c
-        c.create_rectangle(x, y, x + w, y + h, outline=GRID)
-        c.create_text(x + 6, y + 4, anchor="nw", text="motors, seen from above (nose up)", fill=DIM, font=FONT)
+        cx, cy = x + w / 2.0, y + h / 2.0
+        arm = min(w, h) * 0.28
+        rr = min(w, h) * 0.15                        # motor disc radius
+        lw = max(3, int(min(w, h) / 60))
+        # body and arms
+        spots = ((-1, -1), (1, -1), (1, 1), (-1, 1))   # M0 FL, M1 FR, M2 RR, M3 RL
+        for sx, sy in spots:
+            c.create_line(cx, cy, cx + sx * arm, cy + sy * arm, fill=DIM, width=lw)
+        c.create_rectangle(cx - arm * 0.25, cy - arm * 0.25, cx + arm * 0.25, cy + arm * 0.25, fill=GRID, outline=DIM)
+        c.create_polygon(cx, cy - arm * 0.55, cx - arm * 0.12, cy - arm * 0.3, cx + arm * 0.12, cy - arm * 0.3,
+                         fill=PLANE)                                  # the nose
         if not self.motors:
-            c.create_text(x + w / 2, y + h / 2, text="no motors in MPU mode", fill=DIM, font=FONT)
+            c.create_text(cx, cy + arm + rr * 0.6, text="no motors in MPU mode", fill=DIM, font=self.fnt(12))
             return
-        # FL FR / RL RR, matching the OLED
-        cells = ((0, 0, 0), (1, 1, 0), (2, 1, 1), (3, 0, 1))
-        cw, chh = (w - 30) / 2.0, (h - 30) / 2.0
-        for i, gx, gy in cells:
-            bx, by = x + 10 + gx * (cw + 10), y + 22 + gy * (chh + 4)
+        f_pct, f_name = self.fnt(17, bold=True), self.fnt(10)
+        for i, (sx, sy) in enumerate(spots):
+            mx, my = cx + sx * arm, cy + sy * arm
             pct = self.motors[i]
             col = COLOURS[i]
-            c.create_rectangle(bx, by, bx + cw, by + chh - 18, outline=col)
-            c.create_rectangle(bx + 1, by + 1, bx + 1 + (cw - 2) * pct / 100.0, by + chh - 19, fill=col, outline="")
-            c.create_text(bx, by + chh - 16, anchor="nw", text=f"{MOTOR_NAMES[i]}  {pct:5.1f} %", fill=col, font=FONT)
+            c.create_oval(mx - rr, my - rr, mx + rr, my + rr, outline=col, width=lw)
+            rf = rr * math.sqrt(max(0.0, pct) / 100.0)   # filled area = thrust
+            if rf > 1:
+                c.create_oval(mx - rf, my - rf, mx + rf, my + rf, fill=col, outline="")
+            c.create_text(mx, my, text=f"{pct:.0f}%", fill=FG, font=f_pct)
+            c.create_text(mx, my + sy * (rr + f_name[1] * 1.2), text=MOTOR_NAMES[i], fill=col, font=f_name)
 
     # ---- the whole window --------------------------------------------------
+    def _chip(self, x, y, text, bg, font):
+        c = self.c
+        w = font[1] * 0.85 * len(text) + font[1] * 1.6
+        h = font[1] * 2.1
+        c.create_rectangle(x, y, x + w, y + h, fill=bg, outline="")
+        c.create_text(x + w / 2, y + h / 2, text=text, fill="#ffffff", font=font)
+        return x + w + font[1]
+
     def draw(self):
         c, w, h = self.c, self.w, self.h
         c.delete("all")
         c.configure(bg=BG)
         if self.mode is None:
-            c.create_text(w / 2, h / 2, fill=DIM, font=FONT_BIG,
-                          text="waiting for $ATT / $EST  (typed quiet? type loud)")
+            c.create_text(w / 2, h / 2, fill=DIM, font=self.fnt(20),
+                          text="waiting for $ATT / $EST\n(start the simulation; typed quiet? type loud)",
+                          justify="center")
             return
 
+        # ---- status bar
+        fb = self.fnt(18, bold=True)
+        bar_h = fb[1] * 2.6
         stale = self.t_last is None or time.monotonic() - self.t_last > 1.5
+        x = 10
         if self.mode == "ATT":
-            state = "ARMED" if self.armed else "disarmed"
-            head = f"SIM   {state}   Kp x{self.kp:.2f}" if self.kp is not None else f"SIM   {state}"
+            x = self._chip(x, 8, "SIM", OFF_COL, fb)
+            x = self._chip(x, 8, "ARMED" if self.armed else "DISARMED", OK_COL if self.armed else OFF_COL, fb)
+            if self.kp is not None:
+                c.create_text(x, 8 + fb[1] * 1.05, anchor="w", text=f"Kp ×{self.kp:.2f}", fill=FG, font=fb)
         else:
-            head = "MPU6050 - estimator only, nothing flies"
+            x = self._chip(x, 8, "MPU6050", MPU_COL, fb)
+            c.create_text(x, 8 + fb[1] * 1.05, anchor="w", text="estimator only - nothing flies",
+                          fill=FG, font=self.fnt(14))
+        right = (f"t {self.board_ms / 1000.0:.1f} s" if self.board_ms is not None else "")
         if stale:
-            head += "   (no telemetry - quiet?)"
-        c.create_text(10, 6, anchor="nw", fill=FG, font=FONT_BIG, text=head)
+            right = "no telemetry - typed quiet?   " + right
+        c.create_text(w - 10, 8 + fb[1] * 1.05, anchor="e", text=right, fill=ALARM if stale else DIM,
+                      font=self.fnt(13))
 
-        top = 36
-        s = max(120, min(h - top - 10, int(w * 0.55)))
+        # ---- the keys, bottom
+        fk = self.fnt(12)
+        key_h = fk[1] * 2.6
+        kx, ky = 10, h - key_h + 4
+        for key, what in self.KEYS:
+            kw = fk[1] * 0.85 * len(key) + fk[1] * 1.2
+            c.create_rectangle(kx, ky, kx + kw, ky + fk[1] * 1.9, fill=GRID, outline=DIM)
+            c.create_text(kx + kw / 2, ky + fk[1] * 0.95, text=key, fill=FG, font=fk)
+            c.create_text(kx + kw + 6, ky + fk[1] * 0.95, anchor="w", text=what, fill=DIM, font=fk)
+            kx += kw + 12 + fk[1] * 0.85 * len(what) + fk[1]
+
+        # ---- horizon left, quad and charts right
+        top, bottom = bar_h + 6, h - key_h - 6
+        s = max(150, min(bottom - top, int(w * 0.6)))
         self._horizon(10, top, s)
-
-        # numbers under the title, right of the horizon
-        x0 = 10 + s + 16
+        x0 = 10 + s + 14
         rw = max(160, w - x0 - 10)
-        lines = [f"estimate  roll {self.roll:7.1f}   pitch {self.pitch:7.1f}  deg"]
-        if self.true:
-            lines.append(f"true      roll {self.true[0]:7.1f}   pitch {self.true[1]:7.1f}")
-            lines.append(f"est-true  roll {self.roll - self.true[0]:7.1f}   pitch {self.pitch - self.true[1]:7.1f}")
-        if self.sp:
-            lines.append(f"setpoint  roll {self.sp[0]:7.1f}   pitch {self.sp[1]:7.1f}")
-        if self.acc:
-            lines.append(f"accel     roll {self.acc[0]:7.1f}   pitch {self.acc[1]:7.1f}")
-        for i, ln in enumerate(lines):
-            c.create_text(x0, top + 16 * i, anchor="nw", fill=FG, font=FONT, text=ln)
-
-        y = top + 16 * len(lines) + 8
-        avail = top + s - y
+        avail = bottom - top
+        fs = self.fnt(11)
         if self.mode == "ATT":
-            mh = max(70, int(avail * 0.24))
-            self._motors(x0, y, rw, mh)
-            y += mh + 8
-            ch = (top + s - y) / 3.0
-            self.roll_s.draw(c, x0, y, rw, ch - 6, "roll (deg)")
-            self.pitch_s.draw(c, x0, y + ch, rw, ch - 6, "pitch (deg)")
-            self.err_s.draw(c, x0, y + 2 * ch, rw, ch - 6, "estimate - true (deg)")
+            qh = min(rw, avail * 0.42)
+            self._quad(x0, top, rw, qh)
+            y = top + qh + 8
+            ch = (bottom - y) / 3.0
+            self.roll_s.draw(c, x0, y, rw, ch - 8, "roll (°)", font=fs, width=3)
+            self.pitch_s.draw(c, x0, y + ch, rw, ch - 8, "pitch (°)", font=fs, width=3)
+            self.err_s.draw(c, x0, y + 2 * ch, rw, ch - 8, "estimate - true (°)", font=fs, width=3)
         else:
             ch = avail / 2.0
-            self.eroll_s.draw(c, x0, y, rw, ch - 6, "roll: filter vs accelerometer (deg)")
-            self.epitch_s.draw(c, x0, y + ch, rw, ch - 6, "pitch: filter vs accelerometer (deg)")
+            self.eroll_s.draw(c, x0, top, rw, ch - 8, "roll: filter vs accelerometer (°)", font=fs, width=3)
+            self.epitch_s.draw(c, x0, top + ch, rw, ch - 8, "pitch: filter vs accelerometer (°)", font=fs, width=3)
+
+        # ---- a board event, across the instrument
+        if self.banner and time.monotonic() < self.banner[2]:
+            text, col, _ = self.banner
+            fbn = self.fnt(20, bold=True)
+            by = top + s * 0.62
+            c.create_rectangle(10, by - fbn[1] * 1.4, 10 + s, by + fbn[1] * 1.4, fill=col, outline="")
+            c.create_text(10 + s / 2, by, text=text, fill="#ffffff", font=fbn, width=s - 20, justify="center")

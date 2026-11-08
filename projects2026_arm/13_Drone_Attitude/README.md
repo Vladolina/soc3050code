@@ -68,10 +68,14 @@ uv run tools/station/station.py        # from the repository root
 Start the simulation from the **Wokwi VS Code extension** (it reads
 `wokwi.toml`, whose `rfc2217ServerPort = 4000` forwards USART2 to the
 station; the browser route cannot). The first `$ATT` frame selects the
-station's lesson 13 view, `tools/station/views/l13_attitude.py`: a full-window
-artificial horizon — the estimate filled, the truth dashed, the setpoint
-dotted (in MPU mode, the accelerometer-only tilt dashed) — the four motors,
-and strip charts of roll, pitch and estimate − truth.
+station's lesson 13 view, `tools/station/views/l13_attitude.py`, which takes
+the whole left of a maximised window (the OLED moves to a small panel above
+the console): ARMED / disarmed in a coloured chip; an artificial horizon as
+tall as the window - the estimate filled, the truth dashed, your stick dotted
+(in MPU mode, the accelerometer-only tilt dashed) - with roll and pitch
+printed large; the quad from above with each motor filled by its thrust;
+charts of roll, pitch and estimate − truth; the board's `failsafe:` and
+`CRASH` lines as a red banner; and the keys along the bottom.
 
 | Key | Does | | Key | Does |
 |---|---|---|---|---|
@@ -88,6 +92,58 @@ lines are routed before the shell's own parser and are never answered.
 **Not yet watched in Wokwi.** The code builds and the view was exercised on
 the PC with frames in the firmware's format; nobody has yet seen the station
 drive this lesson.
+
+## Class tasks - one change, predict, run, explain
+
+Your instructor gives you **one task number**. For that task:
+
+1. **Predict.** Before you build, write down what you expect to see - in the
+   station (the horizon, the motors, the charts) and in the host test.
+2. **Change.** Make only the change the task asks for.
+3. **Run.** `host\run.bat` first: which checks fail, and what do its tables
+   say? Then `build.bat`, restart the simulation, and fly it from the station.
+4. **Explain.** In one sentence: why did it behave that way? If your
+   prediction was wrong, say which line you misread.
+5. **Show.** `git diff` - the instructor reads your change there.
+   Afterwards `git checkout -- .` puts the lesson back.
+
+| Task | Change | Ask yourself |
+|---|---|---|
+| **T1** Lazy angle loop | `control.c`: `angle_kp = 9.0f` -> `4.5f` | Faster or slower to reach a 20 deg tilt? More or less overshoot? |
+| **T2** No D | `control.c`: `rate_kd = 0.0008f` -> `0.0f` | How much does such a tiny number matter? |
+| **T3** No I | `control.c`: `rate_ki = 0.15f` -> `0.0f` | Which host check fails - and why *that* one? |
+| **T4** A slow wrist | `control.c`: `max_rate = 3.5f` -> `1.0f` (rad/s) | How long must a 20 deg step now take, at most 57 deg/s? |
+| **T5** Weak arms | `control.c`: `max_out = 0.25f` -> `0.08f` | Press B for a gust: how far does it tilt now? |
+| **T6** A nervous failsafe | `control.h`: `CTRL_TILT_LIMIT 1.0472f` (60 deg) -> `0.5236f` (30 deg) | Push the stick all the way. What happens, and why? (`STICK_MAX` in `Main.c`) |
+| **T7** Slow motors | `world.c`: `tau_motor = 0.030f` -> `0.100f` | The controller did not change. Why does the drone? |
+| **T8** A heavy wing | `world.c`: `ixx = 0.004f` -> `0.016f` | Roll and pitch both step 20 deg: which one changes? |
+| **T9** A shaking frame | `world.c`: `vib_accel = 6.0f` -> `24.0f` | Which suffers - the estimate, the flight, or both? |
+| **T10** A drifting gyro | `world.c`: `gyro_walk = 0.0005f` -> `0.005f` | Ten times the drift: does the drone notice? |
+
+### Answers - read them after you have written your prediction
+
+Measured on the host (`host/run.sh`: the real `control.c` and `world.c`), each
+change applied alone and then undone; every one builds with zero warnings.
+Without any change: roll +20 deg rises in 0.200 s, 0.3 % overshoot, settles in
+0.336 s; a gust peaks at 11.2 deg and is back within 3 deg in 0.166 s; the
+estimate's error is 0.20 deg RMS; 24 of 24 checks pass.
+
+| Task | What happens | Why, in one sentence | Host test |
+|---|---|---|---|
+| **T1** | Slower and gentler: roll +20 rises in 0.442 s (was 0.200), no overshoot, settles in 0.706 s; a gust takes 0.286 s to recover (was 0.166). | The angle loop asks for half the tilt rate per degree of error, so the drone is pulled back half as hard. | **2 checks fail** (rise < 0.35 s, roll and pitch) |
+| **T2** | Barely different: roll settles in 0.470 s (was 0.336), pitch rises in 0.226 s (was 0.140). | D acts on how fast the rate error changes; on this well-damped stand it is a small polish, not what holds the drone up. | passes |
+| **T3** | Flies as well as before (roll settles 0.302 s) - but the anti-windup comparison fails. | With no integrator there is nothing to wind up, so switching anti-windup off can no longer make things "far worse": the test was measuring the I term. | **1 check fails** |
+| **T4** | Slower steps: roll rises in 0.282 s; the held-then-released test peaks at 32.6 deg and needs 0.780 s (was 0.282). | The angle loop may only ask for 1 rad/s (57 deg/s), so every large correction is rate-limited. | passes |
+| **T5** | Steps barely change, but **a gust tilts it twice as far**: 22.6 deg (was 11.2), back in 0.364 s. | The rate loop can only push 8 % differential thrust: enough to steer gently, not to fight a hard kick. | passes |
+| **T6** | Full stick can disarm the drone: on the host, a held 30 deg setpoint ends in TILT although the true tilt peaked at 29.9 deg - the estimate's noise crossed the line. The 15 rad/s kick is caught in 40 ms instead of 84. | `STICK_MAX` asks for 30 deg and the failsafe now fires at 30 deg: a limit must sit clearly above anything the pilot can command. | **1 check fails** (the 30 deg held setpoint ends in TILT) |
+| **T7** | Wild: roll +20 overshoots 33 %, oscillates 52 deg/s and never settles in 3 s; a gust takes 2 s. | The motors answer three times later, so the controller keeps pushing after it should have stopped - delay in the loop destabilises gains tuned for fast motors. | **8 checks fail** |
+| **T8** | Roll overshoots 23 % and a gust tilts it 28.8 deg - **pitch is exactly as before** (0.140 s, 1.8 %). | Four times the roll inertia, same gains: the roll axis now needs gains of its own. | **3 checks fail** |
+| **T9** | The estimate gets noisier (0.264 deg RMS noise, was 0.064) and the flight with it: pitch and roll -20 no longer settle within 1 s. | Vibration reaches the accelerometer, the filter passes 2 % of it each step, and the controller chases it. | **2 checks fail** |
+| **T10** | Nothing visible: every check passes; the drone still holds level within 1.0 deg over 30 s. | The complementary filter's accelerometer half keeps pulling the gyro's drifting integral back - that is what it is for (compare Lab Part 2, gyro only). | passes |
+
+Worth comparing side by side: **T7 and T8** - the controller is unchanged and
+the drone changed; **T6** - a safety limit that fires on a legal command;
+**T3** - a test that fails because it measured something that is gone.
 
 ## Facts checked against sources, not memory
 

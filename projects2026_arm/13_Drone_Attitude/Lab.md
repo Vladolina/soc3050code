@@ -253,10 +253,13 @@ the serial port), then, from the repository root:
 uv run tools/station/station.py
 ```
 
-The OLED appears large on the left; the first `$ATT` picks the attitude
-view: a window-sized horizon with the estimate filled, the truth dashed and
-your setpoint dotted, the four motors, and charts of roll, pitch and
-estimate − truth. Click the picture and the keyboard is the board: arrows =
+The first `$ATT` picks the attitude view, which takes the whole left of the
+window (the OLED moves to a small panel at the top right): a horizon as tall
+as the screen with the estimate filled, the truth dashed and your stick
+dotted, roll and pitch printed large, ARMED or disarmed in a coloured chip,
+the quad from above with each motor filled by its thrust, and charts of
+roll, pitch and estimate − truth. A failsafe or crash appears as a red
+banner across the horizon. Click the picture and the keyboard is the board: arrows =
 stick, `a` = arm, `b` = gust, `s` = SIM/MPU, `1`–`5` = the knob, `?` = the
 list. Type `quiet` in the station's command line to stop `$ATT`, `loud` to
 start it again.

@@ -11,7 +11,10 @@ One window, three parts:
 
   the OLED      the board's 128 x 64 panel, drawn large.  The board sends it
                 as $FB frames (_lib/mirror.c) while the station asks, with a
-                $MIRROR,1 every second.
+                $MIRROR,1 every second.  A view whose picture matters more
+                than the OLED (layout = "view": the drone, the robots) gets the
+                whole left side, and the OLED moves to a small panel at the top
+                right.
   the view      the lesson's own picture of its telemetry, at the PC's
                 resolution - an artificial horizon, a map, a pendulum.  Chosen
                 by the first $ frame that a view in views/ claims; the generic
@@ -57,6 +60,7 @@ HOLDABLE = {"UP", "DOWN", "LEFT", "RIGHT", "a", "b", "p", "s"}
 KEY_CHARS = set("abps12345-+=?")
 ARROWS = {"Up": "UP", "Down": "DOWN", "Left": "LEFT", "Right": "RIGHT"}
 REPEAT_MS = 200
+SMALL_SCALE = 3          # OLED pixels per board pixel when the view comes first
 
 
 def checksum(body):
@@ -188,7 +192,14 @@ class Station:
 
         root.title("SOC3050 station")
         root.configure(bg=BG)
-        root.geometry(args.geometry)
+        if args.geometry:
+            root.geometry(args.geometry)
+        else:                                     # a classroom projector: use all of it
+            root.geometry("1400x860")
+            try:
+                root.state("zoomed")              # maximised (Windows; not every platform)
+            except tk.TclError:
+                pass
 
         s = args.scale
         left = tk.Frame(root, bg=BG)
@@ -199,12 +210,20 @@ class Station:
         root.columnconfigure(1, weight=2)
         root.rowconfigure(0, weight=1)
 
-        self.oled_canvas = tk.Canvas(left, width=128 * s, height=64 * s, bg=OLED_OFF, highlightthickness=3,
-                                     highlightbackground=BG, highlightcolor=ACCENT, takefocus=1)
-        self.oled_canvas.pack(side="top", padx=8, pady=(8, 4))
+        # Two places for the OLED: large above the view (layout "oled", lesson 12,
+        # where the game IS the OLED), or small above the console (layout
+        # "view", where the lesson's own picture should have the space).
         self.oled_img = tk.PhotoImage(width=128, height=64)
-        self.oled_big = self.oled_img.zoom(s)
-        self.oled_item = self.oled_canvas.create_image(3, 3, anchor="nw", image=self.oled_big)
+        self.oled_big = self.oled_img
+        self.oled_slots = {}
+        for where, parent, scale in (("oled", left, s), ("view", right, max(1, min(s, SMALL_SCALE)))):
+            cv = tk.Canvas(parent, width=128 * scale, height=64 * scale, bg=OLED_OFF, highlightthickness=3,
+                           highlightbackground=BG, highlightcolor=ACCENT, takefocus=1)
+            item = cv.create_image(3, 3, anchor="nw", image=self.oled_img)
+            self.oled_slots[where] = (cv, item, scale)
+        self.layout = "oled"
+        self.oled_canvas, self.oled_item, self.oled_scale = self.oled_slots["oled"]
+        self.oled_canvas.pack(side="top", padx=8, pady=(8, 4))
 
         self.view_title = tk.Label(left, text="", bg=BG, fg=FG, font=FONT, anchor="w")
         self.view_title.pack(side="top", fill="x", padx=10)
@@ -234,7 +253,7 @@ class Station:
         self.entry.bind("<Up>", lambda e: self._hist(-1))
         self.entry.bind("<Down>", lambda e: self._hist(1))
 
-        for w in (self.oled_canvas, self.view_canvas):
+        for w in (self.oled_slots["oled"][0], self.oled_slots["view"][0], self.view_canvas):
             w.bind("<Button-1>", lambda e, w=w: w.focus_set(), add="+")
             w.bind("<KeyPress>", self._key_down)
             w.bind("<KeyRelease>", self._key_up)
@@ -259,9 +278,28 @@ class Station:
     def _set_view(self, cls):
         self.view_canvas.unbind("<Button-1>")
         self.view_canvas.bind("<Button-1>", lambda e: self.view_canvas.focus_set())
+        self._place_oled(getattr(cls, "layout", "oled"))
         self.view = cls(self.view_canvas, self)
         self.view.resize(max(self.view_canvas.winfo_width(), 200), max(self.view_canvas.winfo_height(), 200))
         self.view_title.config(text=f"{cls.title}   -   {cls.help}")
+
+    def _place_oled(self, layout):
+        """Move the OLED to the slot this view's layout asks for."""
+        if layout not in self.oled_slots or layout == self.layout:
+            return
+        had_focus = self.root.focus_get() is self.oled_canvas
+        self.oled_canvas.pack_forget()
+        self.layout = layout
+        self.oled_canvas, self.oled_item, self.oled_scale = self.oled_slots[layout]
+        if layout == "oled":
+            self.oled_canvas.pack(side="top", padx=8, pady=(8, 4), before=self.view_title)
+        else:
+            self.oled_canvas.pack(side="top", padx=6, pady=(8, 2), before=self.status)
+        self.oled.dirty = True                     # redraw it at the new size
+        # A view that comes first also gets three quarters of the width.
+        self.root.columnconfigure(0, weight=3)
+        self.root.columnconfigure(1, weight=1 if layout == "view" else 2)
+        (self.oled_canvas if had_focus else self.view_canvas).focus_set()
 
     # ---- what the board sent ---------------------------------------------
     def _poll(self):
@@ -276,6 +314,10 @@ class Station:
             f = parse_frame(line)
             if f is None:
                 self._say(None, line)
+                try:
+                    self.view.text(line)           # e.g. "failsafe: ..." as a banner
+                except Exception as e:  # noqa: BLE001
+                    self._say("info", f"view error on a text line: {e}")
                 continue
             name = f[0]
             self.frames_in += 1
@@ -322,7 +364,7 @@ class Station:
         if self.oled.dirty:
             self.oled.dirty = False
             self.oled_img.put(self.oled.rows(), to=(0, 0))
-            self.oled_big = self.oled_img.zoom(self.args.scale)
+            self.oled_big = self.oled_img.zoom(self.oled_scale)
             self.oled_canvas.itemconfigure(self.oled_item, image=self.oled_big)
         try:
             self.view.draw()
@@ -442,7 +484,7 @@ def main():
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--view", choices=sorted(views.all_views()), help="force a view instead of choosing by frame")
     ap.add_argument("--scale", type=int, default=5, help="OLED pixels per board pixel (default 5)")
-    ap.add_argument("--geometry", default="1400x860")
+    ap.add_argument("--geometry", help="window size, e.g. 1400x860 (default: maximised)")
     ap.add_argument("--snapshot", help=argparse.SUPPRESS)       # docs: save a PNG after --after s, then quit
     ap.add_argument("--after", type=float, default=4.0, help=argparse.SUPPRESS)
     args = ap.parse_args()
