@@ -219,6 +219,37 @@ now taught:**
 
 ## Status
 
+**Run in Wokwi on 2026-11-08: it freezes right after the banner.** The banner
+prints in full (`OLED : 0x3C ready`, `MPU6050 : not found`), then nothing:
+no `$ATT`, no OLED picture, no sound, no response to A. Paused in the
+debugger (VS Code: **ARM: Attach to a lesson in Wokwi (pick)**, then
+`-exec p 'os.c'::tasks[0]@6` in the Debug Console), the task table read:
+
+| task | CPU ticks | state |
+|---|---|---|
+| world (prio 5) | 12 734 | ready, `wake = 2` |
+| ctrl, pilot, disp | 0 | ready, never ran |
+| shell | 0 | blocked on the UART queue |
+| idle | 2 | |
+
+So **the world task never sleeps**: in Wokwi one `world_step` + `world_sense`
+takes longer than its 2 ms period, `os_delay_until()` then returns at once
+every time (it only sleeps when ahead of schedule), and every lower-priority
+task starves forever. On silicon the same step is 0.36 ms (`host/cycles.py`,
+48.8 % for world + control together), so Wokwi's emulated CPU is evidently
+much slower than real time relative to its SysTick - possibly worse on a
+busy PC. Ruled out on the way: deadlock (no task holds two locks), stack
+overflow (world and control need at most 144 B of 1 KB, measured on the
+M0+ model), the clock (48 MHz is set), the RTOS itself (lesson 08 ran on it).
+
+**Not yet fixed.** The plan: (1) an overrun guard in `task_world` and
+`task_ctrl` - when behind schedule, drop the lost time and still yield, so
+lower tasks always run; (2) if Wokwi needs it, a slow-motion pace as in
+lesson 12 - the world and control periods both multiplied by one factor, so
+their 2:1 ratio holds (if control outran the world it would see a stale
+IMU and trip `FS_STALE`). Still to measure: `-exec p world.t` against
+`-exec p 'os.c'::ticks` after a pause - their ratio is the factor.
+
 Builds with **zero warnings** (FLASH 28 524 B, RAM 11 120 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
