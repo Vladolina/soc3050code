@@ -635,13 +635,16 @@ drawn large, the lesson's telemetry drawn at the PC's resolution (an artificial
 horizon, a map, a pendulum), and a console. Its keyboard sends real key-down
 and key-up as `$KEY` frames; `_lib/kbd.c` folds them into the same `pad_t`
 the pins fill. The OLED reaches the PC as `$FB` frames from `_lib/mirror.c`,
-sent only while the station asks. **The board computes; the PC draws** - the
+sent only while the station asks. The window opens maximised; a lesson whose
+own picture matters more than the OLED (lesson 13's horizon) takes the whole
+left side, and the OLED moves to a small panel above the console. **The board computes; the PC draws** - the
 serial link carries state at a few KB/s, never pixels at PC resolution.
 
 Python and pyserial come from the course's uv environment (`uv sync` at the
 root). Each lesson's `wokwi.toml` forwards the UART as
 `rfc2217ServerPort = 4000`. `tools/station/fakeboard.py` stands in for a board.
-**Run against `fakeboard.py` only so far; never yet against Wokwi.** Details
+Tested against `fakeboard.py` and by drawing each view headless; **not yet
+confirmed here against Wokwi**. Details
 and the protocol: `tools/station/README.md`.
 
 ## Decisions

@@ -13,7 +13,7 @@ ground station:
 
 | Part of the window | What it is | Board side |
 |---|---|---|
-| the OLED | the board's own screen, drawn 5× (`--scale`) | `_lib/mirror.c` sends it as `$FB` frames while the station asks |
+| the OLED | the board's own screen: large above the view (5×, `--scale`) - or small above the console when the view comes first | `_lib/mirror.c` sends it as `$FB` frames while the station asks |
 | the view | the lesson's telemetry drawn at the PC's resolution: a horizon, a map, a robot | the frames the lesson already sends (`$ATT`, `$NAV`, `$BAL`, ...) |
 | the console | everything the board prints, and a command line for its shell | the lesson's shell |
 
@@ -74,12 +74,33 @@ frame whose name is in a view's `frames` tuple selects it; `--view NAME`
 forces one; `views/plot.py` (a strip chart of every numeric field) is the
 fallback. To write one, copy a lesson's view and read `views/base.py`.
 
+The window opens **maximised** (`--geometry 1400x860` for a fixed size). A
+view chooses the layout:
+
+| `layout` | The view gets | The OLED | Used by |
+|---|---|---|---|
+| `"oled"` (default) | the space under the OLED | large, top left | lesson 12 - the game *is* the OLED |
+| `"view"` | the whole left side, three quarters of the width | small (3×), above the console | lesson 13 - the horizon matters more |
+
+What `views/base.py` gives a view: `frame(name, fields, t)` for every
+checksum-verified frame; `text(line)` for every line that is not a frame
+(lesson 13 turns `failsafe:` and `CRASH` into a banner); `draw()` about 30
+times a second; `fnt(size)`, a font that grows with the window so a
+projector can read it; and `Strip`, a strip chart that drops points older
+than its window.
+
 ## Testing without a board
 
 `fakeboard.py` is a pretend board on TCP port 4001: it answers `$MIRROR` with a
 moving ball, sends `$PERF`, and moves the ball with the `$KEY` arrows — a key's
 round trip, press to pixel, with no simulator. `--replay FILE` also plays a
-capture of real board output.
+capture of real board output; `--no-scene` leaves the screen to it.
+
+To *look at* a view without a screen in the way, draw it headless: a Tk
+canvas that is never shown, fed frames by hand, exported with
+`canvas.postscript()` and turned into a PNG by Ghostscript (MiKTeX ships it
+as `mgs`). Placing the window off-screen does not work - Tk never paints a
+canvas nobody can see.
 
 ## Wokwi
 
