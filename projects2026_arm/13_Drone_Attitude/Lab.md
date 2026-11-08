@@ -269,8 +269,8 @@ closer to the setpoint line after half a second — the filled horizon or the
 dashed one?
 
 > They should all sit together within a degree (host: 0.20° RMS estimate
-> error). **Not yet watched in Wokwi** — if the station shows anything
-> else, write down what.
+> error). The lesson runs in Wokwi (2026-11-08), but this figure has not
+> been read there yet — if the station shows anything else, write down what.
 
 ---
 

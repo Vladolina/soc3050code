@@ -110,7 +110,7 @@ still works from the station's command line; `quiet` stops the 25 Hz
 `failsafe:`, `CRASH`) are never silenced. The station's `$KEY` and `$MIRROR`
 lines are routed before the shell's own parser and are never answered.
 
-**The 3D race view is not yet watched against Wokwi.** It was exercised
+**The 3D race view was watched working against Wokwi (2026-11-08).** It was first exercised
 headless on the PC (2026-11-08): a scripted pilot sending `$ATT` frames in
 the firmware's format flew all ten rings (40.5 s), and the missed-ring,
 crash, disarm and MPU paths were driven too. A draw takes ~16 ms at
@@ -290,9 +290,9 @@ rate in `stats` give Wokwi's slowdown directly.
 Builds with **zero warnings** (FLASH 28 768 B, RAM 11 144 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
-**Not yet watched running in Wokwi.** Nothing on the OLED, no button, no
-slider and no `stats` output has been seen, and neither has the station
-route (keys, `quiet`/`loud`, the OLED mirror, the attitude view). When someone does, look first at:
+**Watched running in Wokwi (2026-11-08)**, after the scheduling fix above:
+the OLED, the sound, the controls and the station route (keys, the 3D race
+view) work. Not yet read off Wokwi and recorded here:
 
 1. **The loop rate on the OLED and `stats`.** It must say 250 Hz with no
    world overruns in SIM mode. If the world and controller do not fit the CPU

@@ -418,8 +418,10 @@ Also: Wokwi's CPU is several times slower than 48 MHz against its own
 SysTick (100 000 empty loop passes: 200 ms), so per-pixel code costs more
 there than on silicon - a full menu redraw takes 40 ms.
 
-**Watched in Wokwi: 12** (2026-11-01, menu, start, stick, sound).
-**Not yet watched — 10, 11, 13–19.** Each README's Status section
+**Watched in Wokwi: 12** (2026-11-01, menu, start, stick, sound) **and 13**
+(2026-11-08, after a scheduling fix; OLED, sound, controls and the station's
+3D race). **Not yet watched — 10, 11, 14–19.** Lessons 14–17 schedule their
+physics the way 13 did before its fix, so expect the same freeze. Each README's Status section
 lists the first three things to look at. The largest open questions are
 on-chip ones a PC cannot answer: real cycles per control step, task stack
 high-water marks (every lesson prints them on `stats`), and whether lesson

@@ -117,7 +117,7 @@ station before or after the simulation — it keeps retrying.
 
 **Status (2026-11-03):** the station has been run against `fakeboard.py` and
 seen working (mirror, view selection, key down/up/repeat, console both ways).
-The firmware side has host tests (lesson 12: `$KEY` and `$MIRROR` checks). **It
-has not yet been run against Wokwi**, and Wokwi's RFC2217 forwarding has never
-been exercised in this repository (lesson 08 also lists it as unproven). That
-is the first thing to try.
+The firmware side has host tests (lesson 12: `$KEY` and `$MIRROR` checks).
+**Run against Wokwi (2026-11-08):** lesson 13 through the VS Code extension's
+RFC2217 port 4000 - keys in, frames out, the 3D race view - seen working.
+Lessons 12 and 14-19 are not yet run with the station against Wokwi.
