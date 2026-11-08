@@ -34,8 +34,27 @@
     //
     // The AVR edition (projects2026_avr/) has no debugger: SimulIDE offers no
     // GDB server. Use its "Simulate Current Project" task instead.
+    //
+    // "ARM: Debug lesson in Wokwi (GDB)" finds the lesson from the active
+    // editor, so it fails with "${fileDirname} can not be resolved" when the
+    // Wokwi tab or the Run panel has the focus. "ARM: Attach to a lesson in
+    // Wokwi (pick)" asks for the lesson instead and does not build: use it when
+    // the simulation is already running (built beforehand), e.g. to press
+    // Pause and see where a board that went silent is stuck.
     "version": "0.2.0",
     "configurations": [
+        {
+            "name": "ARM: Attach to a lesson in Wokwi (pick)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/projects2026_arm/${input:armLesson}/Main.elf",
+            "cwd": "${workspaceFolder}/projects2026_arm/${input:armLesson}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "${workspaceFolder}/tools/arm-toolchain/bin/arm-none-eabi-gdb.exe",
+            "miDebuggerServerAddress": "localhost:3333",
+            "stopAtConnect": false,
+            "externalConsole": false
+        },
         {
             "name": "ARM: Debug lesson in Wokwi (GDB)",
             "type": "cppdbg",
@@ -48,6 +67,22 @@
             "preLaunchTask": "Build Current Project",
             "stopAtConnect": false,
             "externalConsole": false
+        }
+    ],
+    "inputs": [
+        {
+            "id": "armLesson",
+            "type": "pickString",
+            "description": "Which lesson is running in Wokwi?",
+            "default": "13_Drone_Attitude",
+            "options": [
+                "04_Startup_And_LinkerScript", "05_GPIO_And_Interrupts", "06_Time_And_Timers",
+                "07_RTOS", "08_UART_And_Python_Host", "09_Sensors_And_Buses",
+                "10_Fixed_Point_And_DMA", "11_Faults_Watchdog_Power", "12_Game",
+                "13_Drone_Attitude", "14_Drone_Missions", "15_Robot_Line_Follower",
+                "16_Robot_Navigation", "17_Robot_Balancing", "18_Robot_Competition",
+                "19_Final_Project"
+            ]
         }
     ]
 }
