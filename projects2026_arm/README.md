@@ -265,7 +265,7 @@ on both. The course stands alone; it does not depend on SOC4180GH.
 | 2 Systems | 10 | Fixed_Point_And_DMA — float vs fixed point on a core with no FPU, the M4F's FPU read from a real disassembly, DMA ◐ | C031C6 / Wokwi (app board) |
 | | 11 | Faults_Watchdog_Power — HardFault decoding on ARMv6-M, CFSR as the M4 has it, watchdogs, WFI; HAL vs CMSIS ◐ | |
 | 3 Applications | 12 | Game — SSD1306 engine + arcade ✅ watched in Wokwi 2026-11-01 after three Wokwi-only fixes; slide 3b teaches I²C, so it stands without 09–11 | C031C6 / Wokwi (app board) |
-| | 13 | Drone_Attitude — IMU fusion, attitude loops, motor mixing ◐ | simulated inside the firmware |
+| | 13 | Drone_Attitude — IMU fusion, attitude loops, motor mixing ✅ watched in Wokwi 2026-11-08 after a scheduling fix (lock-step + overrun guard); the station flies it as a 3D race through rings; slides 0a–0j teach how a drone flies from zero | simulated inside the firmware |
 | | 14 | Drone_Missions — position hold, missions from Python, failsafes ◐ | |
 | | 15 | Robot_Line_Follower ◐ | |
 | | 16 | Robot_Navigation — mapping, A*, Python path planner ◐ | |
@@ -373,7 +373,7 @@ every host test passes:
 | 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
 | 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
 | 12 | 19 304 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 50 bus bytes a frame against 1104 for a full repaint (games at half speed since 2026-11-03) |
-| 13 | 28 524 / 11 120 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
+| 13 | 28 768 / 11 144 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
 | 14 | 29 600 / 10 776 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
 | 15 | 29 484 / 9 744 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
 | 16 | 31 100 / 11 584 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |

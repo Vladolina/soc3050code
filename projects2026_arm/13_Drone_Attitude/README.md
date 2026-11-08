@@ -27,7 +27,7 @@ and Slide 22 measures what it costs.
 
 | | |
 |---|---|
-| `Slide.md` | the lecture - 30 pages as rendered: the title, the two pin-map slides, then the numbered slides, each register block's one-page map before its details |
+| `Slide.md` | the lecture - 44 pages as rendered: the title, the two pin-map slides, **Part 0 (slides 0a-0j): how a drone flies, for students who have never met one** (parts, thrust, hover, counter-rotating props, the four moves, tilt to travel, why it needs a computer, a glossary, a map of the deck), then the numbered slides - 1b-1d show the whole program (files and layers, the five tasks and their data, `main()`'s boot order), 23b the station's 3D race - each register block's one-page map before its details |
 | `Lab.md` | the lab: Parts 0–8, ~2 hours, a tuning contest with a score, **nothing handed in** |
 | `control.h` | **the contract**: `sensors_t`, `actuators_t`, `control_step()`, tuning struct, failsafe codes, frames and signs |
 | `control.c` | **subject — the student's file.** Complementary filter, angle and rate loops, D on measurement, anti-windup, X mixer, saturation, arming and failsafes. Pure C |
@@ -44,7 +44,7 @@ and Slide 22 measures what it costs.
 ## Build and run
 
 ```
-build.bat          # FLASH 28524 B / 32 KB, RAM 11120 B / 12 KB, zero warnings
+build.bat          # FLASH 28768 B / 32 KB, RAM 11144 B / 12 KB, zero warnings
 host\run.bat       # PASSED: 0 of 24 checks failed
 uv run host\cycles.py         # needs Main.elf; about 35 s
 simulate.bat
@@ -70,12 +70,33 @@ Start the simulation from the **Wokwi VS Code extension** (it reads
 station; the browser route cannot). The first `$ATT` frame selects the
 station's lesson 13 view, `tools/station/views/l13_attitude.py`, which takes
 the whole left of a maximised window (the OLED moves to a small panel above
-the console): ARMED / disarmed in a coloured chip; an artificial horizon as
-tall as the window - the estimate filled, the truth dashed, your stick dotted
-(in MPU mode, the accelerometer-only tilt dashed) - with roll and pitch
-printed large; the quad from above with each motor filled by its thrust;
-charts of roll, pitch and estimate − truth; the board's `failsafe:` and
-`CRASH` lines as a red banner; and the keys along the bottom.
+the console).
+
+**In SIM mode it is a 3D race.** The quad is drawn in 3D (chase camera) at
+the attitude the board's world really has, each propeller disc lit by its
+motor's thrust, with a white wireframe at the attitude the estimator
+believes - the gap between them is the filter's error. Ten numbered rings
+stand in a slalom: press `a` to arm and the clock starts; fly through them
+in order with the arrows; the time and the session's best stay on screen.
+A fading trail shows the last 30 s of flight in 3D, and a map beside it
+the whole trajectory and the rings. Also on screen: the artificial horizon
+as a small instrument (estimate filled, truth dashed, your stick dotted),
+the quad from above with each motor filled by its thrust, charts of roll,
+pitch and estimate − truth, and the board's `failsafe:` and `CRASH` lines as
+a red banner. A crash drops the quad and restarts the run from the pad.
+
+**The travel is the station's, not the board's.** The board's drone is on a
+gimbal: it only tilts. The station turns the true tilt into horizontal
+acceleration (`g·tan(tilt)`, minus drag of 0.7 /s, so 20° tops out near
+5 m/s) and holds altitude at ring height, stepping by the board's own
+milliseconds so a slow simulator slows the race too. The view says so on
+screen. Everything that decides the lap time - the attitude, how fast it
+follows the stick, overshoot, the estimator - is the board's: a sluggish
+`1`, an oscillating `5` or a gust (`b`) costs seconds. That makes a lap
+time a score for each class task below.
+
+In MPU mode nothing flies, so the view is the large horizon (the
+accelerometer-only tilt dashed) and filter-vs-accelerometer charts.
 
 | Key | Does | | Key | Does |
 |---|---|---|---|---|
@@ -89,9 +110,11 @@ still works from the station's command line; `quiet` stops the 25 Hz
 `failsafe:`, `CRASH`) are never silenced. The station's `$KEY` and `$MIRROR`
 lines are routed before the shell's own parser and are never answered.
 
-**Not yet watched in Wokwi.** The code builds and the view was exercised on
-the PC with frames in the firmware's format; nobody has yet seen the station
-drive this lesson.
+**The 3D race view is not yet watched against Wokwi.** It was exercised
+headless on the PC (2026-11-08): a scripted pilot sending `$ATT` frames in
+the firmware's format flew all ten rings (40.5 s), and the missed-ring,
+crash, disarm and MPU paths were driven too. A draw takes ~16 ms at
+1600 x 860, inside the station's 33 ms redraw.
 
 ## Class tasks - one change, predict, run, explain
 
@@ -242,15 +265,29 @@ busy PC. Ruled out on the way: deadlock (no task holds two locks), stack
 overflow (world and control need at most 144 B of 1 KB, measured on the
 M0+ model), the clock (48 MHz is set), the RTOS itself (lesson 08 ran on it).
 
-**Not yet fixed.** The plan: (1) an overrun guard in `task_world` and
-`task_ctrl` - when behind schedule, drop the lost time and still yield, so
-lower tasks always run; (2) if Wokwi needs it, a slow-motion pace as in
-lesson 12 - the world and control periods both multiplied by one factor, so
-their 2:1 ratio holds (if control outran the world it would see a stale
-IMU and trip `FS_STALE`). Still to measure: `-exec p world.t` against
-`-exec p 'os.c'::ticks` after a pause - their ratio is the factor.
+**Fixed the same day and watched working in Wokwi** (OLED, sound and
+controls all respond). Two changes in `Main.c`:
 
-Builds with **zero warnings** (FLASH 28 524 B, RAM 11 120 B). `host/run.bat`
+1. **Lock-step.** "ctrl" no longer keeps its own 4 ms timer. Every second
+   world step, "world" puts a beat on `beat_q`; "ctrl" waits for it, runs
+   one `control_step`, and in SIM mode answers on `done_q`, which "world"
+   waits for. The controller therefore runs exactly once per two physics
+   steps at any CPU speed, so it never sees a stale sample (`FS_STALE`) or
+   integrates one twice. (Simply resyncing each task's own timer, the
+   first plan, would not have held that ratio.) In MPU mode there is no
+   answer to wait for: ctrl may sit on the I2C bus behind the display.
+2. **Overrun guard** in "world": if the last cycle (its step plus ctrl's)
+   took 2 ms or more, it sleeps as long as the cycle took, instead of
+   returning at once from `os_delay_until()`. The physics runs in slow
+   motion and the pilot, shell and display tasks get about half the CPU.
+   `stats` counts these as `world overruns`; the `control loop ... Hz`
+   figure then shows the real (slower) rate. On silicon a cycle is about
+   1.3 ms (`host/cycles.py`) and the guard never fires.
+
+Still worth measuring when it runs: `world overruns` and the control-loop
+rate in `stats` give Wokwi's slowdown directly.
+
+Builds with **zero warnings** (FLASH 28 768 B, RAM 11 144 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
 **Not yet watched running in Wokwi.** Nothing on the OLED, no button, no
@@ -258,7 +295,7 @@ slider and no `stats` output has been seen, and neither has the station
 route (keys, `quiet`/`loud`, the OLED mirror, the attitude view). When someone does, look first at:
 
 1. **The loop rate on the OLED and `stats`.** It must say 250 Hz with no
-   late wake-ups in SIM mode. If the world and controller do not fit the CPU
+   world overruns in SIM mode. If the world and controller do not fit the CPU
    in Wokwi's timing, everything else is moot. Compare `stats`' cycle counts
    with the table above — Wokwi's are a third opinion.
 2. **The signs.** Joystick right must make the horizon's right end rise and

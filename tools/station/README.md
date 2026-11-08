@@ -80,7 +80,7 @@ view chooses the layout:
 | `layout` | The view gets | The OLED | Used by |
 |---|---|---|---|
 | `"oled"` (default) | the space under the OLED | large, top left | lesson 12 - the game *is* the OLED |
-| `"view"` | the whole left side, three quarters of the width | small (3×), above the console | lesson 13 - the horizon matters more |
+| `"view"` | the whole left side, three quarters of the width | small (3×), above the console | lesson 13 - its 3D race matters more |
 
 What `views/base.py` gives a view: `frame(name, fields, t)` for every
 checksum-verified frame; `text(line)` for every line that is not a frame
@@ -88,6 +88,13 @@ checksum-verified frame; `text(line)` for every line that is not a frame
 times a second; `fnt(size)`, a font that grows with the window so a
 projector can read it; and `Strip`, a strip chart that drops points older
 than its window.
+
+**3D** is `views/scene3d.py`: a pinhole camera, vectors, an attitude
+rotation and near-plane clipping for a plain Tk canvas - no OpenGL, no numpy,
+the painter's algorithm for depth. Lesson 13's view is its first user (a
+chase-camera quad racing through rings); lessons 14-17 can reuse it. A Tk
+canvas cannot clip to a rectangle, so a 3D panel is drawn first and the
+area outside it painted over before the rest of the view is drawn.
 
 ## Testing without a board
 

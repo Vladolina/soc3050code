@@ -42,7 +42,7 @@ host\run.bat
 simulate.bat
 ```
 
-`build.bat` must end with zero warnings, **FLASH 28 524 B and RAM 11 120 B**
+`build.bat` must end with zero warnings, **FLASH 28 768 B and RAM 11 144 B**
 — most of the chip. `host\run.bat` must end `PASSED: 0 of 24 checks
 failed`. Paste `diagram.json` into Wokwi (it adds an MPU6050 to the app
 board), then upload `Main.elf`.

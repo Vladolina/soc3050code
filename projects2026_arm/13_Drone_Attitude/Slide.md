@@ -12,12 +12,18 @@ settles level. Push the joystick: the horizon tilts 20° in a third of a
 second. Press B: a gust hits it at 229°/s and it is back within 3° in 0.17 s.
 Turn the knob too far: it buzzes. Too little: it wobbles itself into the
 ground. None of it needs a drone — the drone is a physics model running on
-the same chip, in its own task, and your flight controller cannot tell.
+the same chip, in its own task, and your flight controller cannot tell. On
+the PC, the station draws it in 3D and times you through a course of rings.
+
+**Never flown a drone? Start at slide 0a.** Part 0 explains, with no
+equations beyond `a = g·tan θ`, how four propellers hold a drone up, turn
+it, and move it — and why it needs a computer at all.
 
 Figures marked **measured on the host** come from `host/sitl.c`, which links
 this lesson's own `world.c` and `control.c` into a PC program. Cycle counts
 come from lesson 10's Cortex-M0+ model running this lesson's `Main.elf`.
-Nothing on these slides was watched in Wokwi.
+The lesson has been watched running in Wokwi with the station (2026-11-08);
+the numbers on the slides are still the host's.
 
 ---
 
@@ -303,6 +309,406 @@ this lesson configures it.
 
 ---
 
+## Slide 0a: Part 0 — How a Drone Flies (No Drone Experience Needed)
+
+Before any code: what a quadcopter **is**, why it stays up, and how it moves.
+Everything later in this lesson is one of these ideas turned into C.
+
+| Slide | Question | The one-line answer |
+|---|---|---|
+| 0b | What is it made of? | a frame, four motors with propellers, a battery, and a small computer |
+| 0c | How does a propeller lift? | it throws air down; the air pushes it up |
+| 0d | How does it hover? | the four thrusts add up to the weight |
+| 0e | Why do two propellers spin backwards? | so the frame itself does not spin |
+| 0f | How does it roll, pitch and yaw? | by making some motors faster and others slower |
+| 0g | How does it fly *somewhere*? | it tilts, and the tilted thrust pushes it sideways |
+| 0h | Why can no human fly it unaided? | nothing holds it level: it must be corrected 250 times a second |
+| 0i | What words will we use? | a glossary |
+| 0j | What comes next? | a map of the rest of the deck |
+
+A quadcopter has **no rudder, no flaps, no wings and no gearbox.** The only
+thing it can change is how fast each of its four motors spins. Every
+manoeuvre you will ever see a drone make — hover, climb, turn, flip, race —
+is four numbers going up and down. This lesson writes the program that
+chooses those four numbers.
+
+---
+
+## Slide 0b: The Parts of a Quadcopter
+
+```svg
+<svg viewBox="0 0 640 270" role="img" aria-label="Quadcopter block diagram: battery feeds four ESCs that drive four motors; the flight controller reads the IMU and the radio receiver and commands the ESCs">
+  <defs><marker id="d13p" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <rect class="box" x="20" y="30" width="120" height="50" rx="6"/>
+  <text x="80" y="52" text-anchor="middle" class="mono">radio receiver</text>
+  <text x="80" y="70" text-anchor="middle" class="lbl">the pilot's sticks</text>
+  <rect class="box" x="20" y="120" width="120" height="50" rx="6"/>
+  <text x="80" y="142" text-anchor="middle" class="mono">IMU</text>
+  <text x="80" y="160" text-anchor="middle" class="lbl">gyro + accelerometer</text>
+  <rect class="hifill" x="200" y="60" width="150" height="90" rx="6"/>
+  <text x="275" y="90" text-anchor="middle" class="mono">flight controller</text>
+  <text x="275" y="110" text-anchor="middle" class="lbl">a microcontroller</text>
+  <text x="275" y="128" text-anchor="middle" class="lbl">running a control loop</text>
+  <path class="wire" d="M140 55 L196 85" marker-end="url(#d13p)"/>
+  <path class="wire" d="M140 145 L196 125" marker-end="url(#d13p)"/>
+  <rect class="box" x="410" y="20" width="90" height="34" rx="5"/><text x="455" y="42" text-anchor="middle" class="mono">ESC 0</text>
+  <rect class="box" x="410" y="64" width="90" height="34" rx="5"/><text x="455" y="86" text-anchor="middle" class="mono">ESC 1</text>
+  <rect class="box" x="410" y="108" width="90" height="34" rx="5"/><text x="455" y="130" text-anchor="middle" class="mono">ESC 2</text>
+  <rect class="box" x="410" y="152" width="90" height="34" rx="5"/><text x="455" y="174" text-anchor="middle" class="mono">ESC 3</text>
+  <path class="wire" d="M350 90 L406 37" marker-end="url(#d13p)"/>
+  <path class="wire" d="M350 100 L406 81" marker-end="url(#d13p)"/>
+  <path class="wire" d="M350 110 L406 125" marker-end="url(#d13p)"/>
+  <path class="wire" d="M350 120 L406 169" marker-end="url(#d13p)"/>
+  <text x="372" y="210" text-anchor="middle" class="lbl">4 speed commands</text>
+  <circle class="reg" cx="560" cy="37" r="15"/><circle class="reg" cx="560" cy="81" r="15"/>
+  <circle class="reg" cx="560" cy="125" r="15"/><circle class="reg" cx="560" cy="169" r="15"/>
+  <path class="wire" d="M500 37 H541 M500 81 H541 M500 125 H541 M500 169 H541"/>
+  <text x="600" y="108" text-anchor="middle" class="mono">motor</text>
+  <text x="600" y="124" text-anchor="middle" class="mono">+ prop</text>
+  <rect class="box" x="410" y="215" width="90" height="34" rx="5"/>
+  <text x="455" y="237" text-anchor="middle" class="mono">battery</text>
+  <path class="dash" d="M455 215 V190"/>
+  <text x="560" y="237" text-anchor="middle" class="lbl">power to all four ESCs</text>
+</svg>
+```
+
+| Part | What it does | In this lesson |
+|---|---|---|
+| **propeller** | throws air down to make thrust | `world.c`: 0–4 N each |
+| **motor** (brushless) | spins the propeller, up to ~30 000 rpm | `world.c`: follows its command 30 ms late |
+| **ESC** (electronic speed controller) | turns "go 40 %" into the three-phase currents a brushless motor needs | the 0..1 numbers in `actuators_t.motor[]` |
+| **battery** (LiPo) | ~11 V, empties in 5–10 minutes | not modelled |
+| **IMU** (inertial measurement unit) | measures rotation rate and the pull of gravity | `world_sense()`, or the Wokwi MPU6050 |
+| **radio receiver** | brings the pilot's sticks | the joystick, the station's arrow keys |
+| **flight controller** | reads the IMU and the sticks, decides the four speeds | **`control.c` on the C031C6 — the part you write** |
+
+---
+
+## Slide 0c: A Propeller Pushes Air Down, the Air Pushes Back Up
+
+```svg
+<svg viewBox="0 0 600 220" role="img" aria-label="Side view of a spinning propeller: air pushed down, thrust pushing the motor up">
+  <defs><marker id="d13q" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <rect class="box" x="130" y="90" width="40" height="40" rx="4"/>
+  <text x="150" y="150" text-anchor="middle" class="lbl">motor</text>
+  <path class="wire" d="M60 86 Q150 76 240 86"/>
+  <path class="hi" d="M150 84 V20" marker-end="url(#d13q)"/>
+  <text x="160" y="30" class="hi">thrust T</text>
+  <path class="dash" d="M80 110 V196" marker-end="url(#d13q)"/>
+  <path class="dash" d="M115 110 V196" marker-end="url(#d13q)"/>
+  <path class="dash" d="M185 110 V196" marker-end="url(#d13q)"/>
+  <path class="dash" d="M220 110 V196" marker-end="url(#d13q)"/>
+  <text x="150" y="214" text-anchor="middle" class="lbl">air thrown downward</text>
+  <text x="310" y="40" class="mono">T = k · ω²</text>
+  <text x="310" y="64" class="lbl">ω = rotor speed. Twice the speed, four times the thrust.</text>
+  <text x="310" y="100" class="mono">fixed blades</text>
+  <text x="310" y="124" class="lbl">The blade angle never changes: speed is the only knob.</text>
+  <text x="310" y="160" class="mono">one direction</text>
+  <text x="310" y="184" class="lbl">It cannot push down. Zero is the least it can do.</text>
+</svg>
+```
+
+Newton's third law: the propeller pushes a column of air **down**, so the air
+pushes the propeller **up**. That push is **thrust**.
+
+Three facts every later slide depends on:
+
+- **Speed is the only control.** A helicopter tilts its blades; a cheap
+  quadcopter cannot. To change thrust it must change the motor speed.
+- **Speed cannot change instantly.** The rotor has inertia: it takes time to
+  spin up. In `world.c` each motor reaches 63 % of a new command after
+  **30 ms** — the *motor lag*, and slide 19's buzzing comes from it.
+- **Thrust has limits:** 0 (stopped) to full (4 N here). A motor cannot
+  push down, and cannot exceed full. Slide 16 is about running into them.
+
+Real thrust grows with the square of speed. `world.c` makes thrust simply
+proportional to the command, as if the ESC had already undone the square —
+many flight controllers do exactly that correction.
+
+---
+
+## Slide 0d: Hover — Thrust Equals Weight
+
+```svg
+<svg viewBox="0 0 600 200" role="img" aria-label="A hovering quadcopter: four thrust arrows up add to the weight arrow down">
+  <defs><marker id="d13r" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <path class="wire" d="M60 110 H260"/>
+  <rect class="box" x="140" y="100" width="40" height="22" rx="4"/>
+  <path class="wire" d="M40 104 H80 M100 104 H140 M180 104 H220 M240 104 H280"/>
+  <path class="hi" d="M60 100 V50" marker-end="url(#d13r)"/>
+  <path class="hi" d="M120 100 V50" marker-end="url(#d13r)"/>
+  <path class="hi" d="M200 100 V50" marker-end="url(#d13r)"/>
+  <path class="hi" d="M260 100 V50" marker-end="url(#d13r)"/>
+  <text x="160" y="36" text-anchor="middle" class="hi">4 × 1.23 N</text>
+  <path class="wire" d="M160 122 V180" marker-end="url(#d13r)"/>
+  <text x="170" y="174" class="mono">m·g = 0.5 kg × 9.81 = 4.9 N</text>
+  <text x="330" y="60" class="mono">each motor: 4.9 / 4 = 1.23 N</text>
+  <text x="330" y="84" class="mono">of 4 N full  = 31 % throttle</text>
+  <text x="330" y="120" class="mono">thrust / weight = 16 / 4.9 = 3.3</text>
+  <text x="330" y="144" class="lbl">the spare 69 % is for climbing — and for control</text>
+</svg>
+```
+
+To **hover**, the four thrusts together must equal the drone's weight. More
+and it climbs, less and it sinks. That shared level is the **throttle**: all
+four motors up together, or all four down.
+
+This lesson's drone weighs 0.5 kg, so each motor needs 1.23 N — **31 %** of
+its range. The station's motor diagram shows numbers near that, and the
+pilot task ramps the throttle to 0.35 when you arm.
+
+**Why the spare thrust matters:** every correction later in this lesson is
+"this motor a bit more, that one a bit less". A motor at 31 % can go **down
+by 31 %** and **up by 69 %** before it hits a limit. A drone with no spare
+thrust can hover but cannot steer.
+
+---
+
+## Slide 0e: Why Two Propellers Spin Backwards
+
+```svg
+<svg viewBox="0 0 640 250" role="img" aria-label="Two quads from above: with all props one way the frame spins; with diagonal pairs opposite, the reaction torques cancel">
+  <defs><marker id="d13s" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <text x="150" y="20" text-anchor="middle" class="mono">all four clockwise</text>
+  <path class="wire" d="M90 60 L210 180 M210 60 L90 180"/>
+  <circle class="reg" cx="90" cy="60" r="24"/><circle class="reg" cx="210" cy="60" r="24"/>
+  <circle class="reg" cx="210" cy="180" r="24"/><circle class="reg" cx="90" cy="180" r="24"/>
+  <text x="90" y="64" text-anchor="middle" class="lbl">CW</text><text x="210" y="64" text-anchor="middle" class="lbl">CW</text>
+  <text x="210" y="184" text-anchor="middle" class="lbl">CW</text><text x="90" y="184" text-anchor="middle" class="lbl">CW</text>
+  <path class="hi" d="M185 120 A35 35 0 1 1 150 85" marker-end="url(#d13s)"/>
+  <text x="150" y="228" text-anchor="middle" class="hi">the frame spins counter-clockwise</text>
+  <text x="470" y="20" text-anchor="middle" class="mono">this lesson: diagonal pairs</text>
+  <path class="wire" d="M410 60 L530 180 M530 60 L410 180"/>
+  <circle class="hifill" cx="410" cy="60" r="24"/><circle class="reg" cx="530" cy="60" r="24"/>
+  <circle class="hifill" cx="530" cy="180" r="24"/><circle class="reg" cx="410" cy="180" r="24"/>
+  <text x="410" y="56" text-anchor="middle" class="mono">M0</text><text x="410" y="72" text-anchor="middle" class="lbl">CW</text>
+  <text x="530" y="56" text-anchor="middle" class="mono">M1</text><text x="530" y="72" text-anchor="middle" class="lbl">CCW</text>
+  <text x="530" y="176" text-anchor="middle" class="mono">M2</text><text x="530" y="192" text-anchor="middle" class="lbl">CW</text>
+  <text x="410" y="176" text-anchor="middle" class="mono">M3</text><text x="410" y="192" text-anchor="middle" class="lbl">CCW</text>
+  <text x="470" y="228" text-anchor="middle" class="hi">the twists cancel: the frame holds still</text>
+  <text x="470" y="246" text-anchor="middle" class="lbl">seen from above, nose up the page</text>
+</svg>
+```
+
+A spinning propeller drags on the air, and the air drags back. The motor
+feels that as a **twist**: it pushes the propeller one way, so the propeller
+pushes the motor — and the whole frame — the **other** way. A helicopter
+needs a tail rotor to stop this; a quadcopter uses its own propellers.
+
+Two propellers spin **clockwise** (M0, M2) and two **counter-clockwise**
+(M1, M3), on the diagonals. At equal speeds their twists cancel exactly and
+the drone does not turn. In `world.c` each motor's twist is
+**0.016 m × its thrust** — about 0.02 N·m at hover, four of them, summing to
+zero.
+
+Keep this in mind: the cancellation is only exact while the pairs are
+**equal**. Unbalance them on purpose and the drone turns — that is yaw, on
+the next slide.
+
+---
+
+## Slide 0f: Four Speeds, Four Moves
+
+Every move is some motors **faster** (+) and the others **slower** (−),
+chosen so the **total thrust stays the same** — the drone turns without
+climbing or sinking.
+
+```svg
+<svg viewBox="0 0 640 230" role="img" aria-label="Four quads from above showing which motors speed up for throttle, roll right, pitch nose up and yaw right">
+  <g>
+    <text x="80" y="20" text-anchor="middle" class="mono">throttle up</text>
+    <path class="wire" d="M40 50 L120 130 M120 50 L40 130"/>
+    <circle class="hifill" cx="40" cy="50" r="20"/><text x="40" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="hifill" cx="120" cy="50" r="20"/><text x="120" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="hifill" cx="120" cy="130" r="20"/><text x="120" y="135" text-anchor="middle" class="mono">+</text>
+    <circle class="hifill" cx="40" cy="130" r="20"/><text x="40" y="135" text-anchor="middle" class="mono">+</text>
+    <text x="80" y="175" text-anchor="middle" class="lbl">all four together</text>
+    <text x="80" y="192" text-anchor="middle" class="lbl">→ climbs</text>
+  </g>
+  <g>
+    <text x="240" y="20" text-anchor="middle" class="mono">roll right</text>
+    <path class="wire" d="M200 50 L280 130 M280 50 L200 130"/>
+    <circle class="hifill" cx="200" cy="50" r="20"/><text x="200" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="reg" cx="280" cy="50" r="20"/><text x="280" y="55" text-anchor="middle" class="mono">−</text>
+    <circle class="reg" cx="280" cy="130" r="20"/><text x="280" y="135" text-anchor="middle" class="mono">−</text>
+    <circle class="hifill" cx="200" cy="130" r="20"/><text x="200" y="135" text-anchor="middle" class="mono">+</text>
+    <text x="240" y="175" text-anchor="middle" class="lbl">left side up</text>
+    <text x="240" y="192" text-anchor="middle" class="lbl">→ right side drops</text>
+  </g>
+  <g>
+    <text x="400" y="20" text-anchor="middle" class="mono">pitch nose up</text>
+    <path class="wire" d="M360 50 L440 130 M440 50 L360 130"/>
+    <circle class="hifill" cx="360" cy="50" r="20"/><text x="360" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="hifill" cx="440" cy="50" r="20"/><text x="440" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="reg" cx="440" cy="130" r="20"/><text x="440" y="135" text-anchor="middle" class="mono">−</text>
+    <circle class="reg" cx="360" cy="130" r="20"/><text x="360" y="135" text-anchor="middle" class="mono">−</text>
+    <text x="400" y="175" text-anchor="middle" class="lbl">front up, rear down</text>
+    <text x="400" y="192" text-anchor="middle" class="lbl">→ nose rises</text>
+  </g>
+  <g>
+    <text x="560" y="20" text-anchor="middle" class="mono">yaw right</text>
+    <path class="wire" d="M520 50 L600 130 M600 50 L520 130"/>
+    <circle class="reg" cx="520" cy="50" r="20"/><text x="520" y="55" text-anchor="middle" class="mono">−</text>
+    <circle class="hifill" cx="600" cy="50" r="20"/><text x="600" y="55" text-anchor="middle" class="mono">+</text>
+    <circle class="reg" cx="600" cy="130" r="20"/><text x="600" y="135" text-anchor="middle" class="mono">−</text>
+    <circle class="hifill" cx="520" cy="130" r="20"/><text x="520" y="135" text-anchor="middle" class="mono">+</text>
+    <text x="560" y="175" text-anchor="middle" class="lbl">CCW pair up, CW pair down</text>
+    <text x="560" y="192" text-anchor="middle" class="lbl">→ nose turns right</text>
+  </g>
+  <text x="320" y="222" text-anchor="middle" class="lbl">all seen from above, nose up the page: M0 FL, M1 FR (top), M3 RL, M2 RR (bottom)</text>
+</svg>
+```
+
+| Move | What turns | Motors faster | Motors slower | Why it works |
+|---|---|---|---|---|
+| **throttle** | nothing — it climbs | all | — | more total thrust than weight |
+| **roll** right | about the nose-to-tail axis | M0, M3 (left) | M1, M2 (right) | the left side is pushed up harder |
+| **pitch** nose up | about the wing-to-wing axis | M0, M1 (front) | M2, M3 (rear) | the front is pushed up harder |
+| **yaw** right | about the vertical axis | M1, M3 (CCW) | M0, M2 (CW) | slide 0e's twists no longer cancel |
+
+Yaw is the **weak** one: it uses only the small drag twist, not thrust
+times the arm. That is why `world.c` makes yaw the hardest axis to turn
+(*Izz* is the largest), and why racing drones yaw slowly compared with how
+fast they flip.
+
+This table, written as four lines of C, is the **mixer** — slide 15.
+
+---
+
+## Slide 0g: To Go Somewhere, It Tilts
+
+A quadcopter's thrust always points **straight out of its top**. It has no
+propeller that pushes sideways. To move forward it **tilts forward**, and
+part of the thrust now points backward-and-down at the air — pushing the
+drone forward.
+
+```svg
+<svg viewBox="0 0 600 240" role="img" aria-label="A quad tilted by angle theta: thrust T splits into T cos theta up, balancing weight, and T sin theta sideways, accelerating it">
+  <defs><marker id="d13t" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <path class="wire" d="M94.8 122.6 L245.2 177.4"/>
+  <path class="wire" stroke-width="3" d="M82.7 112.8 L110.9 123.1 M229.1 166.9 L257.3 177.2"/>
+  <polygon class="box" points="158.6,137.4 186.8,147.6 181.4,162.6 153.2,152.4"/>
+  <path class="hi" d="M173.4 140.6 L207.6 46.6" marker-end="url(#d13t)"/>
+  <text x="213" y="46" class="hi">T</text>
+  <path class="dash" d="M170 46.6 H207.6 V150"/>
+  <path class="wire" d="M170 150 V50" marker-end="url(#d13t)"/>
+  <text x="162" y="66" text-anchor="end" class="mono">T cos θ</text>
+  <path class="wire" d="M170 150 H204" marker-end="url(#d13t)"/>
+  <text x="214" y="146" class="mono">T sin θ</text>
+  <path class="wire" d="M170 152 V222" marker-end="url(#d13t)"/>
+  <text x="178" y="220" class="mono">m·g</text>
+  <path class="reg" d="M170 110 A40 40 0 0 1 183.7 112.4"/>
+  <text x="178" y="104" class="lbl">θ</text>
+  <text x="330" y="50" class="mono">hold height:  T cos θ = m g</text>
+  <text x="330" y="80" class="mono">sideways:     a = g · tan θ</text>
+  <text x="330" y="120" class="lbl">tilt  5° → 0.86 m/s²</text>
+  <text x="330" y="140" class="lbl">tilt 10° → 1.73 m/s²</text>
+  <text x="330" y="160" class="lbl">tilt 20° → 3.57 m/s²</text>
+  <text x="330" y="180" class="lbl">tilt 30° → 5.66 m/s²  (and 15 % more throttle</text>
+  <text x="330" y="196" class="lbl">just to keep from sinking: 1 / cos 30° = 1.15)</text>
+</svg>
+```
+
+So **attitude is how a drone steers.** To go right, roll right; to stop,
+roll left until the speed is gone; to hover in one place, stay level. A
+GPS "go to that point" controller (lesson 14) only ever asks for tilts —
+which is why the attitude controller in *this* lesson is the foundation of
+everything a drone does.
+
+This is exactly the arithmetic the station's 3D race does with the tilt
+your board reports (slide 23b).
+
+---
+
+## Slide 0h: Nothing Holds It Level — Why a Computer Flies It
+
+An aeroplane is **stable**: let go of the controls and its wings and tail
+bring it back to level flight. A quadcopter has nothing like that. Spin it
+and it keeps spinning; tilt it and it stays tilted — and, by slide 0g,
+starts sliding sideways.
+
+And it is always being tipped. **One motor 1 % stronger than the rest** —
+normal manufacturing spread — pushes 0.04 N harder at 0.085 m from the
+centre. By slide 4's numbers that is an angular acceleration of
+0.85 rad/s², and left alone it tips the drone over **20° in one second**.
+Add gusts, a battery that is not quite centred, and a bent propeller.
+
+A human reacts in about 0.2 s. So the flight controller runs a **feedback
+loop**, 250 times a second here:
+
+```svg
+<svg viewBox="0 0 640 150" role="img" aria-label="Feedback loop: sense with the IMU, estimate the attitude, compare with the stick, decide the motor speeds, the drone moves, sense again">
+  <defs><marker id="d13u" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <rect class="box" x="10" y="30" width="110" height="46" rx="6"/>
+  <text x="65" y="50" text-anchor="middle" class="mono">1. sense</text><text x="65" y="66" text-anchor="middle" class="lbl">IMU, slide 6</text>
+  <rect class="box" x="140" y="30" width="110" height="46" rx="6"/>
+  <text x="195" y="50" text-anchor="middle" class="mono">2. estimate</text><text x="195" y="66" text-anchor="middle" class="lbl">filter, slides 7-11</text>
+  <rect class="hifill" x="270" y="30" width="110" height="46" rx="6"/>
+  <text x="325" y="50" text-anchor="middle" class="mono">3. compare</text><text x="325" y="66" text-anchor="middle" class="lbl">with the stick</text>
+  <rect class="box" x="400" y="30" width="110" height="46" rx="6"/>
+  <text x="455" y="50" text-anchor="middle" class="mono">4. decide</text><text x="455" y="66" text-anchor="middle" class="lbl">PID + mixer, 12-16</text>
+  <rect class="box" x="530" y="30" width="100" height="46" rx="6"/>
+  <text x="580" y="50" text-anchor="middle" class="mono">5. act</text><text x="580" y="66" text-anchor="middle" class="lbl">4 motor speeds</text>
+  <path class="wire" d="M120 53 H136" marker-end="url(#d13u)"/>
+  <path class="wire" d="M250 53 H266" marker-end="url(#d13u)"/>
+  <path class="wire" d="M380 53 H396" marker-end="url(#d13u)"/>
+  <path class="wire" d="M510 53 H526" marker-end="url(#d13u)"/>
+  <path class="wire" d="M580 76 V120 H65 V80" marker-end="url(#d13u)"/>
+  <text x="320" y="138" text-anchor="middle" class="lbl">the drone moves; 4 ms later, sense again</text>
+</svg>
+```
+
+The pilot's stick therefore never touches a motor. In **angle mode** — this
+lesson — the stick says *"be at 20° of roll"* and the computer works out
+how. (In **acro mode**, used by racing pilots, the stick says *"rotate at
+200 °/s"*; in **position mode**, lesson 14, it says *"go there"*.)
+
+---
+
+## Slide 0i: Words for the Rest of the Lesson
+
+| Word | Meaning |
+|---|---|
+| **attitude** | which way the drone is tilted and pointing: roll, pitch, yaw |
+| **roll / pitch / yaw** | tilt sideways / tilt nose up or down / turn left or right (slide 3 fixes the signs) |
+| **rate** | how fast it is rotating, in °/s — what a gyro measures |
+| **throttle** | the shared thrust level of all four motors |
+| **setpoint** | what the pilot asks for, e.g. "20° of roll" |
+| **estimate** | what the flight controller *believes* the attitude is — never exactly the truth |
+| **IMU, gyro, accelerometer** | the sensor chip; its rotation-rate half; its gravity-and-shake half |
+| **ESC, motor command** | the motor driver; the 0..1 number we send it |
+| **mixer** | turns "roll this much, pitch that much" into four motor commands |
+| **arm / disarm** | allow the motors to spin / force them off — a safety switch |
+| **failsafe** | a rule that disarms when something is wrong |
+| **gimbal / test stand** | a mount that lets the drone rotate but not travel — our simulated drone sits on one |
+| **SITL** | software in the loop: the real flight code flying a simulated drone (slide 1) |
+
+---
+
+## Slide 0j: The Map of This Lesson
+
+Part 0 was the drone. The rest of the deck is the program that flies it,
+in the order the data flows: physics in, sensor, estimate, decision,
+motors out.
+
+| Slides | Part | You will learn |
+|---|---|---|
+| 1–3 | the setup | how one chip runs both the drone and its pilot; the whole program (1b–1d); the signs |
+| 4–5 | the physics | 0c–0f again, as equations in `world.c` |
+| 6–11 | sensing | why neither IMU half is enough alone, and how to combine them |
+| 12–16 | control | the two loops, the PID, the mixer, the limits |
+| 17–19 | safety and tuning | when to refuse to fly; what a bad gain looks like |
+| 20–25 | the firmware | five tasks, the CPU budget, the screen, the real sensor, telemetry |
+| 23b | the race | fly it in 3D, and let your lap time grade your tuning |
+
+---
+
 ## Slide 1: How Do We Fly a Drone Without a Drone?
 
 Split the program in two, and let them talk through **one narrow contract**:
@@ -349,6 +755,138 @@ blink and *grade* the result.
 The syllabus proposed Webots for this lesson. It is not installed here and
 could not be verified, so the plant moved inside the firmware — which turns
 out to teach more: the plant has a CPU cost, and slide 22 measures it.
+
+---
+
+## Slide 1b: The Whole Program — Files and Layers
+
+Four layers, top to bottom. You edit the top one; the rest you call.
+
+```svg
+<svg viewBox="0 0 640 344" role="img" aria-label="Program layers: lesson files on top, shared _lib modules, CMSIS and startup, then the chip and the Wokwi parts; the PC station and host test beside it">
+  <text x="10" y="18" class="lbl">this lesson's folder</text>
+  <rect class="hifill" x="10" y="24" width="140" height="62" rx="6"/>
+  <text x="80" y="46" text-anchor="middle" class="mono">control.c</text>
+  <text x="80" y="62" text-anchor="middle" class="lbl">the flight controller</text>
+  <text x="80" y="76" text-anchor="middle" class="lbl">225 lines - YOURS</text>
+  <rect class="box" x="160" y="24" width="140" height="62" rx="6"/>
+  <text x="230" y="46" text-anchor="middle" class="mono">world.c</text>
+  <text x="230" y="62" text-anchor="middle" class="lbl">the simulated drone</text>
+  <text x="230" y="76" text-anchor="middle" class="lbl">physics + IMU, 214 lines</text>
+  <rect class="box" x="310" y="24" width="160" height="62" rx="6"/>
+  <text x="390" y="46" text-anchor="middle" class="mono">Main.c</text>
+  <text x="390" y="62" text-anchor="middle" class="lbl">5 tasks, MPU driver, OLED,</text>
+  <text x="390" y="76" text-anchor="middle" class="lbl">shell, telemetry - the glue</text>
+  <text x="10" y="112" class="lbl">_lib/ - shared with the other lessons</text>
+  <rect class="box" x="10" y="118" width="460" height="88" rx="6"/>
+  <text x="20" y="140" class="mono">os       </text><text x="90" y="140" class="lbl">the RTOS: tasks, delays, queues, mutexes (lesson 07)</text>
+  <text x="20" y="158" class="mono">uart proto retarget</text><text x="190" y="158" class="lbl">serial port, $ frames + checksum, printf (08)</text>
+  <text x="20" y="176" class="mono">i2c oled pad adc beep</text><text x="200" y="176" class="lbl">I²C bus (09), screen, joystick + knob, buzzer</text>
+  <text x="20" y="196" class="lbl">keys kbd mirror fmath.h - the station's keys and OLED copy; small fast sin, atan2, sqrt</text>
+  <text x="10" y="230" class="lbl">below everything</text>
+  <rect class="box" x="10" y="236" width="460" height="36" rx="6"/>
+  <text x="240" y="259" text-anchor="middle" class="mono">CMSIS headers · startup.c · link.ld (lesson 04)</text>
+  <rect class="reg" x="10" y="282" width="460" height="52" rx="6"/>
+  <text x="240" y="302" text-anchor="middle" class="mono">STM32C031C6 in Wokwi</text>
+  <text x="240" y="320" text-anchor="middle" class="lbl">+ SSD1306 OLED, joystick, knob, buttons, buzzer, MPU6050</text>
+  <rect class="box" x="490" y="24" width="140" height="62" rx="6"/>
+  <text x="560" y="46" text-anchor="middle" class="mono">host/sitl.c</text>
+  <text x="560" y="62" text-anchor="middle" class="lbl">PC test: same world.c</text>
+  <text x="560" y="76" text-anchor="middle" class="lbl">+ control.c, 24 checks</text>
+  <rect class="box" x="490" y="246" width="140" height="62" rx="6"/>
+  <text x="560" y="268" text-anchor="middle" class="mono">station.py</text>
+  <text x="560" y="284" text-anchor="middle" class="lbl">on the PC: 3D view,</text>
+  <text x="560" y="298" text-anchor="middle" class="lbl">keys in, frames out</text>
+  <path class="dash" d="M470 308 H490"/>
+  <text x="480" y="334" text-anchor="middle" class="lbl">serial, 115 200 baud</text>
+</svg>
+```
+
+| File | Knows about | Does **not** know about |
+|---|---|---|
+| `control.c` | `sensors_t` in, `actuators_t` out (slide 2) | tasks, timers, registers, whether the drone is real |
+| `world.c` | physics and the IMU's flaws | tasks, the controller's insides |
+| `Main.c` | everything: it wires the two above to the RTOS, the pins and the PC | how to fly |
+
+That separation is why `host/sitl.c` can link the **same** `control.c` and
+`world.c` into a PC program and fly four minutes in a second: neither file
+contains a single register or RTOS call.
+
+---
+
+## Slide 1c: The Whole Program — Five Tasks and What Flows Between Them
+
+```svg
+<svg viewBox="0 0 640 300" role="img" aria-label="Task data flow: world and ctrl exchange g_sens and g_act in lock-step; pilot turns the pad and station keys into rc setpoints and sends telemetry; shell reads the serial port; disp draws the OLED">
+  <defs><marker id="d13v" markerWidth="8" markerHeight="8" refX="7" refY="3.4" orient="auto" markerUnits="userSpaceOnUse">
+    <path d="M0.5 0.8 L7 3.4 L0.5 6 z" fill="currentColor"/></marker></defs>
+  <rect class="box" x="20" y="20" width="150" height="56" rx="6"/>
+  <text x="95" y="42" text-anchor="middle" class="mono">world  prio 5</text>
+  <text x="95" y="60" text-anchor="middle" class="lbl">500 Hz: world_step + sense</text>
+  <rect class="hifill" x="300" y="20" width="150" height="56" rx="6"/>
+  <text x="375" y="42" text-anchor="middle" class="mono">ctrl  prio 4</text>
+  <text x="375" y="60" text-anchor="middle" class="lbl">250 Hz: control_step</text>
+  <path class="wire" d="M170 34 H296" marker-end="url(#d13v)"/>
+  <text x="233" y="28" text-anchor="middle" class="mono">g_sens + beat</text>
+  <path class="wire" d="M300 64 H174" marker-end="url(#d13v)"/>
+  <text x="237" y="80" text-anchor="middle" class="mono">g_act + done</text>
+  <rect class="box" x="300" y="130" width="150" height="56" rx="6"/>
+  <text x="375" y="152" text-anchor="middle" class="mono">pilot  prio 3</text>
+  <text x="375" y="170" text-anchor="middle" class="lbl">50 Hz: sticks, beeps, $ATT</text>
+  <path class="wire" d="M375 130 V80" marker-end="url(#d13v)"/>
+  <text x="368" y="110" text-anchor="end" class="mono">rc_roll rc_pitch rc_thr rc_arm</text>
+  <path class="wire" d="M296 158 H95 V80" marker-end="url(#d13v)"/>
+  <text x="104" y="150" class="lbl">req_kick, req_reset (pilot → world)</text>
+  <rect class="box" x="20" y="214" width="150" height="56" rx="6"/>
+  <text x="95" y="236" text-anchor="middle" class="mono">shell  prio 2</text>
+  <text x="95" y="254" text-anchor="middle" class="lbl">serial in: commands, $KEY</text>
+  <rect class="box" x="300" y="214" width="150" height="56" rx="6"/>
+  <text x="375" y="236" text-anchor="middle" class="mono">disp  prio 1</text>
+  <text x="375" y="254" text-anchor="middle" class="lbl">15 Hz: OLED, then $FB</text>
+  <path class="wire" d="M170 230 H240 V172 H296" marker-end="url(#d13v)"/>
+  <text x="180" y="224" class="lbl">keys (kbd)</text>
+  <rect class="reg" x="500" y="130" width="130" height="56" rx="6"/>
+  <text x="565" y="152" text-anchor="middle" class="mono">pad + knob</text>
+  <text x="565" y="170" text-anchor="middle" class="lbl">ADC, buttons</text>
+  <path class="wire" d="M500 158 H454" marker-end="url(#d13v)"/>
+  <rect class="reg" x="500" y="214" width="130" height="56" rx="6"/>
+  <text x="565" y="236" text-anchor="middle" class="mono">OLED, MPU6050</text>
+  <text x="565" y="254" text-anchor="middle" class="lbl">I²C, bus_lock</text>
+  <path class="wire" d="M450 242 H496" marker-end="url(#d13v)"/>
+  <rect class="reg" x="500" y="20" width="130" height="56" rx="6"/>
+  <text x="565" y="42" text-anchor="middle" class="mono">UART2 → PC</text>
+  <text x="565" y="60" text-anchor="middle" class="lbl">print_lock</text>
+  <path class="dash" d="M450 150 L520 76"/>
+  <text x="320" y="292" text-anchor="middle" class="lbl">higher priority always runs first; lower tasks get the CPU while higher ones sleep or wait</text>
+</svg>
+```
+
+**One step of flight, in order:** `world` wakes (every 2 ms) → steps the
+physics with the last `g_act` → writes the new IMU sample to `g_sens` →
+every second step puts a **beat** → `ctrl` wakes, reads `g_sens` and the
+pilot's `rc_*`, runs `control_step()`, writes `g_act`, answers **done** →
+`world` sleeps until the next 2 ms. The other three tasks run in the time
+left over (slide 20, slide 22).
+
+---
+
+## Slide 1d: The Whole Program — What `main()` Does First
+
+Before any task runs, `main()` (the bottom of `Main.c`) brings the board up
+in an order where each step can rely on the ones before it:
+
+| Order | Call | Why first |
+|---|---|---|
+| 1 | `uart_init`, banner | so every later step can report itself |
+| 2 | `pad_init`, `beep_init` | the joystick, knob, buttons and buzzer |
+| 3 | `i2c_init`, `oled_init`, `mpu_init` | one bus, two chips; a missing MPU6050 just means SIM mode only |
+| 4 | `world_init`, `world_sense`, `control_init` | the drone level and still; a first IMU sample ready |
+| 5 | `kbd_init`, two queues, five `os_task_create` | the station's keys, the beat, the tasks |
+| 6 | `os_start()` | never returns: from here the RTOS decides who runs |
+
+After `os_start()` there is no main loop. Everything the program does from
+then on happens inside one of the five tasks of slide 1c — the shape every
+RTOS program has (lesson 07).
 
 ---
 
@@ -457,7 +995,14 @@ I w' = tau - w x (I w) - c w
 ```
 
 and a **quaternion** integrates the rates, so no attitude is singular — a
-flipped drone is just upside down, not a division by zero. Past 90° of tilt
+flipped drone is just upside down, not a division by zero.
+
+In words: Euler's equation is Newton's *F = m·a* for turning — **torque =
+inertia × angular acceleration**. More torque spins it up faster; a heavier
+or wider drone (larger *I*) spins up slower. The extra terms are a
+spinning body's gyroscopic coupling and a little air damping. A quaternion
+is four numbers that store "which way the drone is pointing" without the
+trouble three angles have when it points straight up. Past 90° of tilt
 the world latches `crashed`.
 
 ---
@@ -862,12 +1407,17 @@ quad it is the hot-motor whine every pilot learns to hear.
 | Task | Rate | Priority | Does |
 |---|---|---|---|
 | world | 500 Hz | 5 (most urgent) | `world_step` + `world_sense` → `g_sens` |
-| ctrl | 250 Hz | 4 | `g_sens` → `control_step` → `g_act` |
+| ctrl | 250 Hz (every 2nd world step) | 4 | `g_sens` → `control_step` → `g_act` |
 | pilot | 50 Hz | 3 | joystick, buttons, knob, throttle ramp, `$ATT` at 25 Hz, beeps |
 | shell | on input | 2 | `stats`, `alpha`, `aw`, `mix`, `kick`, `hold`, `quiet`, `loud`; the station's `$KEY` / `$MIRROR` |
 | disp | 15 Hz | 1 | horizon, motor bars, flush to the OLED, then up to 2 `$FB` mirror frames |
 
-The physics is the most urgent task because physics waits for nobody. The
+The physics is the most urgent task. It waits for one thing only: every
+second step it hands ctrl a beat (a one-item queue) and waits until ctrl's
+step is done, so the controller sees every fourth millisecond of flight
+exactly once even on a CPU too slow to keep up. If a cycle overruns its
+2 ms, the world then sleeps as long as the cycle took, so the lower tasks
+still run and the flight goes into slow motion (Wokwi does this). The
 structs cross between tasks inside two-line critical sections (lesson 03's
 tearing):
 
@@ -959,6 +1509,38 @@ rate and frame rate.
 
 ---
 
+## Slide 23b: The Station — Fly It in 3D, Let the Clock Grade You
+
+`uv run tools/station/station.py` (VS Code task **ARM: Station**) turns the
+`$ATT` frames into a 3D view of the drone and a race through ten rings:
+
+- the quad drawn at the **true** attitude, each propeller disc lit by its
+  motor's thrust — slide 0f's table, live;
+- a white wireframe at the attitude the **estimator** believes: when it
+  separates from the solid quad, that is slide 11's error;
+- press `a` to arm and the clock starts; fly the rings in order with the
+  arrows; a trail and a map show the path you flew.
+
+**Who does what** — the line between the two is the honest part:
+
+| Done by | What |
+|---|---|
+| **the board** | the attitude: physics, sensor, filter, both loops, mixer, failsafes |
+| **the station** | turning tilt into travel with slide 0g's `a = g·tan θ`, minus air drag (0.7 /s), at ring height |
+
+The board's drone is on a gimbal (slide 4): it tilts but cannot travel. The
+station does the travel arithmetic — on the board's own clock — and says so
+on screen. Everything that decides your lap time is still the board's: how
+fast the attitude follows the stick, whether it overshoots, how wrong the
+estimate is. At 20° the drone tops out near **5 m/s** (3.57 / 0.7).
+
+**So a lap time is a measurement.** Fly the course at `1` (Kp ×0.19), `3`
+(×1) and `5` (×5.3); fly it with `alpha 0` and with `alpha 1000`; fly it
+after `b` throws a gust at you. The class tasks in the README become a
+league table.
+
+---
+
 ## Slide 24: The Real Sensor — MPU Mode
 
 Joystick **SEL** swaps the world for the Wokwi MPU6050 at `0x68`, on the
@@ -1005,10 +1587,9 @@ charts the estimated roll (field 2) from a capture; field 6 is the truth.
 Chart both in turn and you have slide 11's error, from the simulator, by
 hand.
 
-Live instead: `uv run tools/station/station.py` draws the same frames as a
-window-sized horizon (estimate, truth, setpoint) with the OLED beside it, and
-sends keys for every control; `quiet` / `loud` stop and restart `$ATT`. Not
-yet watched in Wokwi.
+Live instead: `uv run tools/station/station.py` draws the same frames as
+slide 23b's 3D race, with the horizon, the motors and the charts beside it,
+and sends keys for every control; `quiet` / `loud` stop and restart `$ATT`.
 
 ---
 
@@ -1023,12 +1604,16 @@ The same `world.c` and `control.c` compile into the firmware unchanged.
 **Measured by lesson 10's M0+ model** (`host/cycles.py`): the cycle
 budget — 48.8 % of the CPU for world plus controller at 1 wait state.
 
-**Not measured:** anything on Wokwi. Not the display, not the buttons, not
-the MPU6050's axes, not what `stats` prints. The M0+ model is a timing
-table, not silicon: Wokwi's own cycle count is a third opinion, and the
-firmware prints it.
+**Watched in Wokwi, not measured there:** the lesson runs — OLED, sound,
+buttons, the station's 3D race — after a fix: Wokwi's CPU runs slower than
+its clock, so the world task overran its 2 ms and starved every other task
+until it was given an overrun guard and a lock-step with the controller
+(slide 20). Not yet read from Wokwi: what `stats` prints, the MPU6050's
+axes. The M0+ model is a timing table, not silicon: Wokwi's own cycle count
+is a third opinion, and the firmware prints it.
 
-**Not modelled:** translation (a gimbal, slide 6), battery sag, propeller
+**Not modelled:** translation (a gimbal, slide 6 — the station's race adds
+it on the PC, slide 23b), battery sag, propeller
 aerodynamics beyond linear thrust, frame flex. A real drone is harder.
 
 ---

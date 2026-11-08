@@ -88,9 +88,22 @@ static volatile uint8_t crashed, mpu_present;
 
 /* measurements, for `stats` and the display */
 static volatile uint32_t cyc_world, cyc_world_max, cyc_ctrl, cyc_ctrl_max;
-static volatile uint32_t ctrl_hz, disp_fps, ctrl_late, mpu_errors;
+static volatile uint32_t ctrl_hz, disp_fps, mpu_errors;
 
 static os_mutex_t print_lock, bus_lock;
+
+/* The beat.  "world" puts one item every second step (4 ms of physics)
+ * and "ctrl" waits for it, so the controller runs exactly once per two
+ * world steps however fast the CPU is: on silicon that is the 250 Hz a
+ * 4 ms timer gives, and in a simulator slower than real time both slow
+ * down together (README, Status).  The item says which mode the beat is
+ * in.  In SIM mode ctrl answers on done_q when its step is finished and
+ * the world waits for that answer - lock-step, so the controller never
+ * sees a stale or a skipped sample.  In MPU mode nobody waits: ctrl may
+ * sit on the I2C bus behind the display, and the physics is idle anyway. */
+static os_queue_t beat_q, done_q;
+static uint8_t    beat_buf[1], done_buf[1];
+static volatile uint32_t world_overruns;
 
 /* The station's keys: "shell" feeds them in, "pilot" applies them to the pad.
  * kbd.c has no lock of its own, so both calls go through kbd_lock. */
@@ -136,25 +149,44 @@ static inline uint32_t cyc_elapsed(uint32_t v0, uint32_t v1)
 }
 
 /* ============================================================================
- *  Task "world": the drone, 500 Hz, the most urgent task - physics waits
- *  for nobody.
+ *  Task "world": the drone, 500 Hz, the most urgent task.  Every second
+ *  step it hands ctrl a beat and, in SIM mode, waits for ctrl's step - the
+ *  one thing physics waits for, so the two stay in step at any CPU speed.
  * ============================================================================ */
 static void task_world(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks(), n = 0;
+    uint32_t last = os_ticks(), n = 0, beat = 0;
     actuators_t act;
     sensors_t   sens;
     memset(&sens, 0, sizeof sens);
 
     for (;;) {
-        os_delay_until(&last, 2);
+        /* Overrun guard.  os_delay_until() only sleeps when ahead of
+         * schedule, so if a step (plus ctrl's, which we wait for) takes
+         * longer than 2 ms it never sleeps, and as the highest priority it
+         * starves every other task: no OLED, no sound, no shell.  That is
+         * what Wokwi does - its CPU runs slower than its SysTick.  When the
+         * last cycle overran, sleep as long as it took instead: the physics
+         * goes into slow motion and the tasks below get about half the CPU.
+         * On silicon a cycle takes under 2 ms and this never fires. */
+        uint32_t took = os_ticks() - last;
+        if (!mode_mpu && took >= 2u) {
+            os_delay(took);                        /* as long as we took     */
+            last = os_ticks();
+            world_overruns++;
+        } else {
+            os_delay_until(&last, 2);
+        }
         if (req_reset) {
             world_reset_attitude(&world);
             req_reset = 0;
             crashed = 0;
         }
-        if (mode_mpu) { continue; }                /* the real sensor rules  */
+        if (mode_mpu) {                            /* the real sensor rules  */
+            if ((++beat & 1u) == 0) { uint8_t b = 1; os_queue_put(&beat_q, &b); }
+            continue;
+        }
         if (req_kick) {
             float s = (req_kick == 1) ? 1.0f : -1.0f;
             world_kick(&world, 4.0f * s, -2.0f * s);   /* 229 deg/s, -115 deg/s */
@@ -179,6 +211,12 @@ static void task_world(void *arg)
         }
 
         __disable_irq(); g_sens = sens; __enable_irq();
+
+        if ((++beat & 1u) == 0) {                  /* every 2nd step: ctrl   */
+            uint8_t b = 0;
+            os_queue_put(&beat_q, &b);
+            os_queue_get(&done_q, &b);             /* wait till it has run   */
+        }
 
         if ((n % 10u) == 0) {                      /* truth, 50 Hz: atan2 x3 */
             float r, p;
@@ -238,18 +276,19 @@ static void mpu_sense(sensors_t *s)
 static void task_ctrl(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks(), n = 0, sec = os_ticks(), count = 0;
+    uint32_t n = 0, sec = os_ticks(), count = 0;
     sensors_t   in;
     actuators_t out;
     ctrl_status_t st;
     memset(&in, 0, sizeof in);
 
     for (;;) {
-        os_delay_until(&last, 4);
-        if ((int32_t)(os_ticks() - last) > 1) { ctrl_late++; }   /* woke late */
+        uint8_t b;
+        os_queue_get(&beat_q, &b);                 /* every 2nd world step   */
+        uint8_t mpu = b;                           /* the beat's mode, fixed */
         if (req_ctrl_reset) { control_reset(); req_ctrl_reset = 0; }
 
-        if (mode_mpu) {
+        if (mpu) {
             if (mpu_present) { mpu_sense(&in); } else { in.imu_ok = 0; }
             in.rc_arm = 0;                         /* never fly on a real IMU */
         } else {
@@ -275,6 +314,7 @@ static void task_ctrl(void *arg)
         control_status(&st);
 
         __disable_irq(); g_act = out; g_st = st; __enable_irq();
+        if (!mpu) { os_queue_put(&done_q, &b); }   /* world: go on           */
 
         count++;
         if (os_ticks() - sec >= 1000u) { ctrl_hz = count; count = 0; sec += 1000u; }
@@ -501,8 +541,8 @@ static void cmd_stats(void)
         (unsigned long)cyc_world, (unsigned long)cyc_world_max, (unsigned long)(cyc_world / 48u));
     say("control_step     : %lu cycles (max %lu) = %lu us of every 4000 us\n",
         (unsigned long)cyc_ctrl, (unsigned long)cyc_ctrl_max, (unsigned long)(cyc_ctrl / 48u));
-    say("control loop %lu Hz, late wake-ups %lu, display %lu fps, OLED bytes %lu, MPU errors %lu\n",
-        (unsigned long)ctrl_hz, (unsigned long)ctrl_late, (unsigned long)disp_fps,
+    say("control loop %lu Hz, world overruns %lu, display %lu fps, OLED bytes %lu, MPU errors %lu\n",
+        (unsigned long)ctrl_hz, (unsigned long)world_overruns, (unsigned long)disp_fps,
         (unsigned long)oled_bytes_sent(), (unsigned long)mpu_errors);
     say("task   CPU%%  stack used/size (words)\n");
     for (uint32_t i = 0; i < os_task_count(); i++) {
@@ -574,6 +614,8 @@ int main(void)
            "             s SIM/MPU, 1-5 Kp, ? keys; the OLED drawn large\n\n");
     kbd_init(&kbd);
 
+    os_queue_init(&beat_q, beat_buf, 1, 1);
+    os_queue_init(&done_q, done_buf, 1, 1);
     os_task_create("world", task_world, 0, stk_world, 256, 5);
     os_task_create("ctrl",  task_ctrl,  0, stk_ctrl,  256, 4);
     os_task_create("pilot", task_pilot, 0, stk_pilot, 384, 3);
