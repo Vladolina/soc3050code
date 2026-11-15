@@ -40,7 +40,7 @@ host\run.bat
 The build must say zero warnings and roughly:
 
 ```
-           FLASH:       18780 B        32 KB     57.31%
+           FLASH:       18828 B        32 KB     57.46%
              RAM:       10552 B        12 KB     85.87%
 ```
 

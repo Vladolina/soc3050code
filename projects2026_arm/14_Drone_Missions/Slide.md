@@ -1512,7 +1512,9 @@ The first build of this lesson **did not link**: FLASH 30 736 B, RAM
 *Measured* with this tree's `arm-none-eabi-gcc` by building each variant.
 Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings;
 with the station's keys and OLED mirror (slide 24) **29 600 B (90.3 %),
-10 776 B (87.7 %)**.
+10 776 B (87.7 %)**; with lesson 13's lock-step and overrun guard (slide 26) and the kernel's
+re-wake
+**29 952 B (91.4 %), 10 808 B (88.0 %)**.
 
 The stack sizes come from `-fstack-usage` plus the C library's prologues (the
 `link` task's deepest path, `ml_handle` → `vframe` → `vsnprintf`, is about
@@ -1551,6 +1553,16 @@ this needs the board or Wokwi running. What the code predicts:
 `control_step()` contains 114 calls into the soft-float library (count the
 `bl __aeabi_f...` in its disassembly), at very roughly 50–100 cycles each, so
 expect a few hundred µs of its 20 ms budget. Lab Part 1 checks the prediction.
+
+*A second witness:* lesson 10's instruction-level M0+ model (`m0sim.py`),
+running this `Main.elf` through a 10 s mission, says the guess is low:
+`world_step()` 0.90 ms (of 10 ms), `world_sense()` 0.38 ms, `control_step()`
+0.99 ms mean and 1.38 ms worst (of 20 ms) - about **16 % of the CPU**. Wokwi
+runs the CPU far slower than its SysTick, so there a step can outlast its
+period. So `ctl` runs in lock-step with `world` (a beat every 2nd step), and
+`world` sleeps as long as a late cycle took instead of starving every task
+below it; `stats` counts those as `world overruns`. On silicon the guard never
+fires.
 
 ---
 

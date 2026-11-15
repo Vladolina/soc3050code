@@ -37,7 +37,7 @@ PC to measure everything this README quotes.
 ## Build and run
 
 ```
-build.bat        # FLASH 29484 B / 32 KB, RAM 9744 B / 12 KB, zero warnings
+build.bat        # FLASH 29532 B / 32 KB, RAM 9744 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
 uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
@@ -127,7 +127,7 @@ add ~170 B of `.bss`. **RAM 9 744 B.** Read `stats` before trusting this.
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 29 484 B, RAM 9 744 B.
+- **Builds with zero warnings**: FLASH 29 532 B, RAM 9 744 B.
 - **The station route** (`$KEY` keys, `$FB` mirror, `quiet`/`loud`, the
   `l15_line.py` view) is built and its view tested on the PC with frames
   from the real `world.c`; **not yet watched in Wokwi**.

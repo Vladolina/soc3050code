@@ -44,7 +44,7 @@ waypoints, altitude, battery, wind.
 ## Build and run
 
 ```
-build.bat        # FLASH 29600 B / 32 KB (90.3 %), RAM 10776 B / 12 KB (87.7 %), zero warnings
+build.bat        # FLASH 29952 B / 32 KB (91.4 %), RAM 10808 B / 12 KB (88.0 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
 uv run host\mission.py host\default.mission          # frames to type/paste into Wokwi
@@ -152,14 +152,69 @@ reports `LANDED` — it cannot tell a crash from a landing.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 29 600 B, RAM 10 776 B. The station's
+- Builds with **zero warnings**: FLASH 29 952 B, RAM 10 808 B. The station's
   keys and OLED mirror (`keys kbd mirror` and their glue in `Main.c`) cost
-  2104 B of flash and 256 B of RAM over the 27 496 / 10 520 before them.
-- Host tests: **all pass** (above).
-- **Not yet watched running in Wokwi.** Nothing in this lesson has run on the
-  simulated chip. When someone does, look first at:
-  1. **`stats` after a minute of flight** — the per-step cost of `ctl` and
-     `world` (slide 26 predicts a few hundred µs for `ctl`) and every task's
+  2104 B of flash and 256 B of RAM over the 27 496 / 10 520 before them; the
+  lock-step below another 304 B and 32 B, the kernel's re-wake 48 B.
+- Host tests: **all pass** (above). They do not link `Main.c` or `os.c`, so
+  they say nothing about either fix below.
+- **Fix 1 - "does not start" in Wokwi (reported 2026-11-16).** This lesson
+  scheduled `world` (10 ms) and `ctl` (20 ms) on independent timers, as
+  lesson 13 did before it froze in Wokwi, where the CPU runs slower than
+  SysTick: the highest-priority task's step outlasts its period,
+  `os_delay_until()` never sleeps, and every task below starves. Lesson 10's
+  M0+ model on this `Main.elf` (10 s mission): `world_step` 0.90 ms,
+  `world_sense` 0.38 ms, `control_step` 0.99 ms mean / 1.38 ms worst -
+  **~16 % of the CPU on silicon**. Lesson 13's fix, ported to `Main.c`:
+  1. **Lock-step.** `ctl` has no timer of its own: every second world step,
+     `world` puts a beat on `beat_q` and waits on `done_q`; `ctl` takes the
+     beat, senses, runs `control_step()` and answers. Exactly 2:1 at any
+     CPU speed, never a stale or a doubled sample.
+  2. **Overrun guard.** If a cycle (world's step plus ctl's) took 10 ms or
+     more, `world` sleeps as long as it took instead of returning at once
+     from `os_delay_until()`: the flight goes into slow motion and the tasks
+     below get about half the CPU. `stats` prints `world overruns`.
+
+  **Seen starting in Wokwi the same day.** `stats` on the ground: `world`
+  step 4.7 ms mean / 13.7 ms worst, `ctl` 0.76 ms mean / 1.76 ms worst,
+  199 world overruns; CPU world 40.5 %, ctl 19.4 %, ui 37.4 %, tel 2.5 %,
+  idle 0 %; deepest stacks link 218/320, ui 216/288, tel 188/288 words (all
+  > 20 words spare); 97 008 OLED bytes sent. Wokwi's `world_step` is ~5x
+  the model's, but `control_step` is not (unexplained - possibly ground vs
+  flight). Most cycles fit their 10 ms; the overruns are the outliers.
+- **Fix 2 - froze mid-mission (2026-11-16, 33 s in, after waypoint 1).**
+  Read with GDB from the frozen Wokwi: `world` BLOCKED on `done_q`; `ctl`
+  BLOCKED with `waiting_on = 0` and its beat unread in `beat_q` (count 1) -
+  a lost wake-up. `ctl` had been switched out at `os_queue_get+78`
+  (0x8003c1a), between `state = OS_BLOCKED` and `waiting_on = q`; `world`
+  and `link` at `schedule+26`, just after the PENDSVSET store. All three
+  addresses lie inside `cpsid i` sections, where a Cortex-M0+ takes no
+  SysTick or PendSV, so **Wokwi took an exception with PRIMASK set**. (A
+  breakpoint on `SysTick_Handler` once reported PRIMASK = 1 on entry; a
+  repeat after an unclean GDB disconnect got no hit, so that check is not
+  settled.) The lock-step makes ~100 queue operations a second, so this
+  lesson meets the window in seconds; any kernel wait in any lesson can.
+  **Fixed in `_lib/os.c`** (lessons 08-19; lesson 07's own copy untouched):
+  blocking writes `waiting_on` before `state`, and every `OS_REWAKE_MS`
+  (10) ticks SysTick wakes every BLOCKED task to re-check its wait - safe
+  because every wait is a `while` loop. A lost wake-up becomes a pause of
+  at most 10 ms. **Not yet re-watched in Wokwi.** Not fixed: the same fault
+  can let the USART ISR race `os_queue_get()` on `rx_queue`, which fits the
+  two `?,ERR,CHECKSUM` refusals seen in that run - a garbled line, not a
+  freeze.
+
+  **Re-watched the same day: the built-in mission flew to the end** (take-off
+  17.5 s, waypoints 0-4 at 25.7 / 31.3 / 38.7 / 45.1 / 51.8 s, RTL, LAND at
+  58.9 s). Still wrong in that run, in **both** directions: five
+  `$ACK,?,ERR,CHECKSUM` (lines in from the station arrive garbled), and
+  lines out are garbled too - `$TRU,3E700,...`, `$DRU,...`, a broken `$FB`,
+  and `$MIS` 3 and 4 missing. Likely the same fault: if SysTick can switch
+  tasks inside `os_mutex_lock()`'s critical section, two tasks can both
+  own `print_lock` and write the TX ring at once. Not yet proven.
+- **A whole mission not yet watched in Wokwi.** When someone flies one, look first at:
+  1. **`stats` after a minute of flight** — `world overruns` (Wokwi's
+     slowdown, directly), the per-step cost of `ctl` and `world` (the M0+
+     model above says ~1 ms each) and every task's
      stack high-water mark; any task within ~20 words of its size needs a
      bigger stack.
   2. **The OLED and the buttons** — does `a` (after the 1 s GPS lock) take

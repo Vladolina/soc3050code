@@ -49,7 +49,7 @@ simulate.bat
 Zero warnings, and close to:
 
 ```
-           FLASH:       31100 B        32 KB     94.91%
+           FLASH:       31148 B        32 KB     95.06%
              RAM:       11584 B        12 KB     94.27%
 ```
 

@@ -75,8 +75,8 @@ simulate.bat
 Zero warnings, and:
 
 ```
-           FLASH:       29600 B        32 KB     90.33%
-             RAM:       10776 B        12 KB     87.70%
+           FLASH:       29952 B        32 KB     91.41%
+             RAM:       10808 B        12 KB     87.96%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board), then

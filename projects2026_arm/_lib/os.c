@@ -4,6 +4,17 @@
  * Lesson 07 is where this file is written and taken apart; keep this copy in
  * step with 07_RTOS/os.c.  From lesson 08 on it is infrastructure.
  *
+ * ONE DELIBERATE DIFFERENCE from lesson 07's copy: the re-wake (OS_REWAKE_MS,
+ * in SysTick_Handler), and blocking writes waiting_on BEFORE state.  Wokwi
+ * was seen (lesson 14, 2026-11-16) taking SysTick/PendSV inside a cpsid i
+ * section, which a Cortex-M0+ never does: a task was switched out between
+ * "state = BLOCKED" and "waiting_on = q", so the put that should have woken
+ * it matched nothing and two tasks waited for each other for ever.  Every
+ * wait below sits in a while loop that re-checks its condition, so waking a
+ * blocked task for nothing is harmless - it looks, and blocks again.  The
+ * re-wake turns any lost wake-up into a delay of at most OS_REWAKE_MS.  On
+ * silicon it never rescues anything and costs a few switches per period.
+ *
  * Three mechanisms make it work, and each is a piece of hardware you have
  * already met:
  *
@@ -91,6 +102,7 @@ static void wake_waiters(const void *obj)
 }
 
 /* ---- the tick ------------------------------------------------------------ */
+static void task_exit(void);                     /* below: an ended task      */
 void SysTick_Handler(void)
 {
     uint32_t pm = enter();
@@ -101,6 +113,17 @@ void SysTick_Handler(void)
             tasks[i].state = OS_READY;
         }
     }
+#if OS_REWAKE_MS
+    if (ticks % OS_REWAKE_MS == 0u) {            /* see the header comment   */
+        for (uint32_t i = 0; i < n_tasks; i++) {
+            if (tasks[i].state == OS_BLOCKED
+             && tasks[i].waiting_on != (const void *)task_exit) {   /* ended: stay */
+                tasks[i].state = OS_READY;
+                tasks[i].waiting_on = 0;
+            }
+        }
+    }
+#endif
     schedule();                                  /* wake-ups, time slices    */
     leave(pm);
 }
@@ -271,8 +294,9 @@ void os_mutex_lock(os_mutex_t *m)
          * priority can keep it from finishing - slide 13. */
         if (m->owner->prio < os_current->prio) { m->owner->prio = os_current->prio; }
 #endif
+        os_current->waiting_on = m;              /* first: see the header    */
+        __COMPILER_BARRIER();                    /* ...and keep that order   */
         os_current->state      = OS_BLOCKED;
-        os_current->waiting_on = m;
         schedule();
         leave(pm);               /* switched out here; back when woken */
         pm = enter();
@@ -309,7 +333,7 @@ void os_queue_put(os_queue_t *q, const void *item)
 {
     uint32_t pm = enter();
     while (q->count == q->capacity) {
-        os_current->state = OS_BLOCKED; os_current->waiting_on = q;
+        os_current->waiting_on = q; __COMPILER_BARRIER(); os_current->state = OS_BLOCKED;
         schedule(); leave(pm); pm = enter();
     }
     q_push(q, item);
@@ -322,7 +346,7 @@ void os_queue_get(os_queue_t *q, void *item)
 {
     uint32_t pm = enter();
     while (q->count == 0) {
-        os_current->state = OS_BLOCKED; os_current->waiting_on = q;
+        os_current->waiting_on = q; __COMPILER_BARRIER(); os_current->state = OS_BLOCKED;
         schedule(); leave(pm); pm = enter();
     }
     memcpy(item, q->buf + (uint32_t)q->head * q->item_size, q->item_size);

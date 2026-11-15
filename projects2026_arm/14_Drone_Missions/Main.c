@@ -137,15 +137,41 @@ static void account(cost_t *c, uint32_t cy)
     c->sum += cy;  c->n++;
 }
 
+/* The beat (lesson 13's fix, README Status).  "world" puts one item on
+ * beat_q every second step and waits on done_q; "ctl" waits for the beat,
+ * runs one control_step() and answers.  So the controller runs exactly once
+ * per two physics steps at ANY CPU speed - 50 Hz on silicon, slower together
+ * with the physics in a simulator slower than real time - and never sees a
+ * stale or a skipped sample. */
+static os_queue_t beat_q, done_q;
+static uint8_t    beat_buf[1], done_buf[1];
+static volatile uint32_t world_overruns;
+
 /* ============================================================================
  *  world - the aircraft, 100 times a second
  * ============================================================================ */
 static void task_world(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks();
+    uint32_t last = os_ticks(), beat = 0;
     for (;;) {
-        os_delay_until(&last, 1000u / WORLD_HZ);
+        /* Overrun guard.  os_delay_until() only sleeps when ahead of
+         * schedule, so if a cycle (this step, plus ctl's, which we wait for)
+         * takes longer than the 10 ms period it never sleeps, and as the
+         * highest priority it starves link, tel and ui: no OLED, no buttons,
+         * no shell.  Wokwi does exactly that - its CPU runs slower than its
+         * SysTick.  When the last cycle overran, sleep as long as it took:
+         * the flight goes into slow motion and the tasks below get about
+         * half the CPU.  On silicon a cycle takes ~2.3 ms at worst
+         * (lesson 10's M0+ model), and this never fires. */
+        uint32_t took = os_ticks() - last;
+        if (took >= 1000u / WORLD_HZ) {
+            os_delay(took);
+            last = os_ticks();
+            world_overruns++;
+        } else {
+            os_delay_until(&last, 1000u / WORLD_HZ);
+        }
         actuators_t a;
         __disable_irq(); a = act; __enable_irq();
         os_mutex_lock(&world_lock);
@@ -154,18 +180,24 @@ static void task_world(void *arg)
         stamp_t t1 = stamp();
         os_mutex_unlock(&world_lock);
         account(&cost_world, cycles(t0, t1));
+
+        if ((++beat & 1u) == 0) {                  /* every 2nd step: ctl    */
+            uint8_t b = 0;
+            os_queue_put(&beat_q, &b);
+            os_queue_get(&done_q, &b);             /* wait till it has run   */
+        }
     }
 }
 
 /* ============================================================================
- *  ctl - the flight computer, 50 times a second
+ *  ctl - the flight computer, once every two world steps (50 Hz)
  * ============================================================================ */
 static void task_ctl(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks();
     for (;;) {
-        os_delay_until(&last, 1000u / CTRL_HZ);
+        uint8_t b;
+        os_queue_get(&beat_q, &b);                 /* every 2nd world step   */
         sensors_t s;
         os_mutex_lock(&world_lock);
         world_sense(&world, &s);                 /* the ONLY door from the world */
@@ -180,6 +212,7 @@ static void task_ctl(void *arg)
         account(&cost_ctl, cycles(t0, t1));
 
         __disable_irq(); act = a; __enable_irq();
+        os_queue_put(&done_q, &b);                 /* world: go on           */
     }
 }
 
@@ -213,6 +246,8 @@ static void cmd_stats(void)
         (unsigned long)us(cost_world.n ? cost_world.sum / cost_world.n : 0),
         (unsigned long)us(cost_ctl.last), (unsigned long)us(cost_ctl.max),
         (unsigned long)us(cost_ctl.n ? cost_ctl.sum / cost_ctl.n : 0));
+    say("world overruns %lu (each one is a 10 ms step that ran late: slow motion)\n",
+        (unsigned long)world_overruns);
     for (uint32_t i = 0; i < os_task_count(); i++) {
         os_task_t *t = os_task(i);
         say("  %-6s CPU %3lu.%lu%%  stack %lu of %lu words\n", t->name,
@@ -487,6 +522,8 @@ int main(void)
     say("  station  : uv run tools/station/station.py - OLED large; keys arrows a b s 1-5 - + ?\n\n");
     kbd_init(&kbd);
 
+    os_queue_init(&beat_q, beat_buf, 1, 1);
+    os_queue_init(&done_q, done_buf, 1, 1);
     os_task_create("world", task_world, 0, stk_world, 160, 5);
     os_task_create("ctl",   task_ctl,   0, stk_ctl,   224, 4);
     os_task_create("link",  task_link,  0, stk_link,  320, 3);

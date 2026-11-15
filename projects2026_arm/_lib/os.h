@@ -20,6 +20,9 @@
 #define OS_TICK_HZ            1000u
 #define OS_PRIORITY_INHERIT   1       /* Lab Part 4 sets this to 0         */
 #define OS_STACK_FILL         0xDEADBEEFu
+#define OS_REWAKE_MS          10u     /* every 10 ticks SysTick wakes every
+                                         BLOCKED task to re-check its wait;
+                                         0 = off, as in lesson 07 (os.c)  */
 
 typedef enum { OS_READY, OS_SLEEPING, OS_BLOCKED } os_state_t;
 
