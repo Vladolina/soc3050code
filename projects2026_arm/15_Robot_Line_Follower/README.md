@@ -37,7 +37,7 @@ PC to measure everything this README quotes.
 ## Build and run
 
 ```
-build.bat        # FLASH 29504 B / 32 KB, RAM 9800 B / 12 KB, zero warnings
+build.bat        # FLASH 29968 B / 32 KB, RAM 9832 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
 uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
@@ -87,7 +87,7 @@ so `ui` went to **288 words** to keep about a quarter spare. `display` also
 builds a `$FB` frame after each flush (`mirror_next` 40 B + `build` 128 B +
 `snprintf`, ≈ 710 B deep with its own frame) and stayed at 256; its 96-byte
 frame buffer is `static`, not on the stack. `kbd_t` and the mirror's hashes
-add ~170 B of `.bss`. **RAM 9 800 B.** Read `stats` before trusting this.
+add ~170 B of `.bss`. **RAM 9 832 B.** Read `stats` before trusting this.
 `stats` prints the real high-water marks; check them before shrinking.
 
 ## Facts checked against sources, not memory
@@ -127,19 +127,33 @@ add ~170 B of `.bss`. **RAM 9 800 B.** Read `stats` before trusting this.
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 29 504 B, RAM 9 800 B.
+- **Builds with zero warnings**: FLASH 29 968 B, RAM 9 832 B.
 - **The station route** (`$KEY` keys, `$FB` mirror, `quiet`/`loud`, the
   `l15_line.py` view) is built and its view tested on the PC with frames
   from the real `world.c`; **not yet watched in Wokwi**.
 - **Host test passes** with the numbers above.
+- **The world step, measured on a model (2026-11-16).** Lesson 10's
+  instruction-level M0+ model (`m0sim.py`) on this `Main.elf`, OVAL, 6 s:
+  `world_step` + `world_sense` **~4.2 ms (≈200 000 cycles) of the 5 ms**
+  budget, every step; `control_step` ~130 µs. Not "a few percent" but 84 %:
+  it fits on silicon, with ~13 % left for ui, shell and display.
+- **Wokwi scheduling (2026-11-16, lesson 14's findings).** Wokwi runs the CPU
+  ~5x slower than its SysTick, so there a world step outlasts its 5 ms,
+  `os_delay_until()` never sleeps, and the top-priority world starves every
+  task below (lesson 13's freeze). `Main.c` now has lesson 13's fix:
+  **lock-step** (`control` has no timer; every 2nd world step `world` puts a
+  beat and waits for control's answer - exactly 2:1, as `host/sitl.c` calls
+  them) and an **overrun guard** (a cycle that ran past 5 ms sleeps as long
+  as it took: slow motion, and `stats` counts `world overruns`). On silicon
+  a cycle is ~4.3 ms and the guard does not fire. FLASH +464 B, RAM +32 B.
+  **Not yet run in Wokwi.**
 - **Not yet watched running in Wokwi.** Nothing on the chip side — timing,
   the display, the buttons, the beeps — has been seen. The first three things
   to look at when someone does:
-  1. **`stats`, the world step's cycles.** It must fit well inside 240 000
-     (5 ms at 48 MHz) or world time falls behind real time and every lap
-     time differs from the host's. This is the lesson's biggest unmeasured
-     assumption: ~3 exact distance checks × 7 sensors plus the judge's 11, in
-     soft float, per step.
+  1. **`stats`, the world step's cycles and `world overruns`.** On silicon
+     the model says ~200 000 of 240 000. In Wokwi expect overruns: the run
+     is then in slow motion, but lap times are world time and should still
+     match the host's.
   2. **Does OVAL at the default knob lap in about 5.1 s** (Lab Part 0)? Close
      agreement with the host says the SITL chain holds on the chip; a
      difference of seconds says the world task is late.

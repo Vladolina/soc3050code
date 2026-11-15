@@ -98,6 +98,18 @@ static volatile float   push_size = 0.20f;  /* N s, button B                 */
 
 /* profile: microseconds, from TIM14 counting at 1 MHz */
 static volatile uint16_t us_world, us_world_max, us_ctrl, us_ctrl_max, us_disp, us_disp_max;
+
+/* The beat.  "world" puts one item on beat_q every 5th step (5 ms of
+ * physics); "control" waits for it.  The queue holds one, so if control has
+ * not taken the last beat yet, world waits for it there: control runs once
+ * per 5 world steps at ANY CPU speed and can never fall more than one beat
+ * behind.  Unlike lessons 13-15, world does NOT wait for control's step:
+ * on silicon world + sense cost ~740 us of every 1000 (lesson 10's M0+
+ * model) and control ~185 us, so both in one slot would leave no margin;
+ * control runs in the ~260 us gaps instead, as it always did. */
+static os_queue_t beat_q;
+static uint8_t    beat_buf[1];
+static volatile uint32_t world_overruns;
 static volatile uint32_t ctrl_steps;
 
 static os_mutex_t print_lock;
@@ -152,9 +164,23 @@ static inline uint16_t now_us(void) { return (uint16_t)TIM14->CNT; }
 static void task_world(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks(), seed = 1;
+    uint32_t last = os_ticks(), seed = 1, beat = 0;
     for (;;) {
-        os_delay_until(&last, 1);
+        /* Overrun guard.  os_delay_until() only sleeps when ahead of
+         * schedule, so a step longer than 1 ms never sleeps, and as the
+         * highest priority it starves every task below: no balance, no
+         * OLED, no shell.  Wokwi does that - its CPU runs slower than its
+         * SysTick (~5x).  Then sleep as long as the step took: the physics
+         * goes into slow motion and the tasks below get about half the CPU.
+         * On silicon a step is ~0.75 ms, and this does not fire. */
+        uint32_t took = os_ticks() - last;
+        if (took >= 1u) {
+            os_delay(took);
+            last = os_ticks();
+            world_overruns++;
+        } else {
+            os_delay_until(&last, 1);
+        }
         uint16_t t0 = now_us();
 
         /* requests from the other tasks */
@@ -183,6 +209,12 @@ static void task_world(void *arg)
         uint16_t dt = (uint16_t)(now_us() - t0);
         us_world = dt;
         if (dt > us_world_max) { us_world_max = dt; }
+
+        if (++beat >= 5u) {                        /* every 5th step: control */
+            beat = 0;
+            uint8_t b = 0;
+            os_queue_put(&beat_q, &b);             /* waits only if it is behind */
+        }
     }
 }
 
@@ -192,9 +224,9 @@ static void task_world(void *arg)
 static void task_control(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks();
     for (;;) {
-        os_delay_until(&last, (uint32_t)(CTRL_DT * 1000.0f + 0.5f));
+        uint8_t b;
+        os_queue_get(&beat_q, &b);                 /* every 5th world step    */
         if (req_reset) { req_reset = 0; control_init(); }
         sensors_t s;
         __disable_irq(); s = snap; __enable_irq();
@@ -314,7 +346,8 @@ static void cmd_stats(void)
     __disable_irq(); tr = truth; __enable_irq();
     /* CPU share of the two control-loop tasks: time per call x calls per second */
     uint32_t load = ((uint32_t)us_world * 1000u + (uint32_t)us_ctrl * 200u) / 10000u;
-    say("world   %u us/step (max %u) x 1000/s\n", us_world, us_world_max);
+    say("world   %u us/step (max %u) x 1000/s, %lu overruns (slow motion)\n",
+        us_world, us_world_max, (unsigned long)world_overruns);
     say("control %u us/step (max %u) x 200/s  -> ~%lu%% of the CPU for both\n",
         us_ctrl, us_ctrl_max, (unsigned long)load);
     say("display %u us/frame (max %u), %lu bytes to the OLED so far\n",
@@ -444,6 +477,7 @@ int main(void)
     print_keys();
     printf("\n");
     kbd_init(&kbd);
+    os_queue_init(&beat_q, beat_buf, 1, 1);
 
     os_task_create("world",   task_world,   0, stk_world, 160, 5);
     os_task_create("control", task_control, 0, stk_ctrl,  160, 4);

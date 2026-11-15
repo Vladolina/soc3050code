@@ -41,7 +41,7 @@ cell.
 ## Build and run
 
 ```
-build.bat          # FLASH 31120 B / 32 KB, RAM 11640 B / 12 KB, zero warnings
+build.bat          # FLASH 31288 B / 32 KB, RAM 11648 B / 12 KB, zero warnings
 simulate.bat       # paste diagram.json, upload Main.elf, press A
 host\run.bat       # or: bash host/run.sh - the whole robot on the PC, ~1 s
 uv run host\planner.py --level 4
@@ -190,15 +190,26 @@ at 8 s, `stats` at 55 s.
    path" to a reachable goal: now decrease-key, measured heap, overflow reported.
 7. A lost robot's estimate off the grid indexed past `cost[]`: clamped.
 8. Built at 34 932 B flash / 15 136 B RAM — did not fit. Slide 23 lists what
-   got it to 29 216 / 11 328 (31 120 / 11 640 since the station's keys and
+   got it to 29 216 / 11 328 (31 288 / 11 648 since the station's keys and
    mirror).
 
 ## Status
 
-Builds with **zero warnings**: FLASH 31 120 B, RAM 11 640 B. The host test
+Builds with **zero warnings**: FLASH 31 288 B, RAM 11 648 B. The host test
 passes (25/25 arrivals, 0 collisions at defaults, "no path" correct, C and
 Python A* identical 15/15), and the firmware ran all five levels to the goal
 in Renode with 0 collisions.
+
+**Wokwi scheduling (2026-11-16, lesson 14's findings).** Wokwi runs the CPU
+~5x slower than its SysTick, so the robot's ~16 ms peak step becomes ~80 ms
+of its 40: `os_delay_until()` would never sleep, and ui and shell, below it,
+would starve. Both `world` and `robot` now keep time through `keep_time()`,
+lesson 13's **overrun guard**: a period that ran late sleeps as long as it
+took. `stats` prints `overruns: world, robot`. Deliberately **no lock-step**
+here, unlike lessons 13-15: the world moving on while the planner thinks is
+part of this lesson, and lock-step would cut the robot's budget from 40 ms
+to under 20. On silicon neither guard fires. FLASH +168 B, RAM +8 B. **Not
+yet run in Wokwi.**
 
 **Not yet watched running in Wokwi.** The first three things to look at when
 someone does:

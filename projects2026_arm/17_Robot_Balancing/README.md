@@ -42,7 +42,7 @@ frames go to lesson 08's `host.py`, or to the PC's station
 ## Build and run
 
 ```
-build.bat        # FLASH 26300 B / 32 KB, RAM 10464 B / 12 KB, zero warnings
+build.bat        # FLASH 26672 B / 32 KB, RAM 10488 B / 12 KB, zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf
 host\run.bat     # or: bash host/run.sh  - exits 0, "all checks passed"
 uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart BAL,3,-30000,30000
@@ -128,14 +128,37 @@ push wins at 1.8 V supply; LQR plus speed feed-forward covers exactly the
 target's 1.41 m instead of 1.72 m.
 
 **What the host cannot show:** anything about the Cortex-M0+ itself — CPU time
-per step (slide 22 is an estimate, ~240 µs for the world step), stack
+per step (slide 22 estimated ~240 µs for the world step), stack
 high-water marks, I²C timing — and anything about Wokwi.
+
+**Measured on lesson 10's M0+ model** (`m0sim.py`, this `Main.elf`, 2 s of
+balancing, 1 flash wait state): `world_step` + `world_sense` **~740 µs** of
+every 1000 (max 755), `control_step` ~185 µs (max 192; PID tilt, cascade and
+LQR within 5 µs). The world alone is 74 % of the CPU on silicon.
 
 ## Status
 
-Builds with **zero warnings** (FLASH 26 300 B, RAM 10 464 B). The host
+Builds with **zero warnings** (FLASH 26 672 B, RAM 10 488 B). The host
 verification passes and its numbers are quoted above and in the deck, each
 labelled *measured on the host*.
+
+**Wokwi scheduling (2026-11-16, lesson 14's findings).** Wokwi runs the CPU
+~5x slower than its SysTick, so a ~740 µs world step there takes several ms;
+with a 1 ms period `os_delay_until()` would never sleep and the top-priority
+world would starve every task below - the freeze lesson 13 had. Two changes
+in `Main.c`, neither of which changes anything on silicon:
+
+1. **Overrun guard** in `world`: if the last step ran past its 1 ms, sleep
+   as long as it took. The physics goes into slow motion; `stats` counts
+   `overruns`.
+2. **The beat**: `control` no longer keeps its own 5 ms timer. Every 5th
+   world step, `world` puts one item on a one-slot queue; `control` takes
+   it. So control runs once per 5 ms of *simulated* time at any CPU speed,
+   and if it falls behind, `world` waits for it at the queue. Unlike lessons
+   13-15, `world` does not wait for control's step: both in one 1 ms slot
+   (~945 µs) would leave no margin on silicon.
+
+Not yet run in Wokwi. FLASH +372 B, RAM +24 B for the two.
 
 **Not yet watched running in Wokwi.** When someone does, look first at:
 

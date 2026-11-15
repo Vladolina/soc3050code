@@ -403,7 +403,7 @@ the I²C driver is polled, so its flush *is* CPU time.
 
 Stacks are sized from `gcc -fstack-usage` plus newlib's printf frames (the
 deepest chain is `send_frame()` → `vsnprintf()` → `_svfprintf_r`, ~510 bytes),
-then checked live with `stats`. The build: **FLASH 29 504 B, RAM 9 800 B**.
+then checked live with `stats`. The build: **FLASH 29 968 B, RAM 9 832 B**.
 
 ---
 
@@ -866,8 +866,15 @@ VAL ; SYST_CVR, counts DOWN | 32 | !23:0 CURRENT
 The kernel's millisecond count plus how far `VAL` has counted down gives a
 cycle-accurate clock with no extra timer. The loop re-reads if a tick lands
 between the two reads. **Budget:** the world step must fit in 240 000 cycles
-(5 ms); the expectation is a few percent of that. The number itself has
-**not yet been measured** — it is the first thing to read in Wokwi.
+(5 ms); the expectation was a few percent of that. **It is not**: lesson
+10's instruction-level M0+ model, running this `Main.elf` on the OVAL track,
+puts `world_step` + `world_sense` at **~4.2 ms - about 200 000 cycles, 84 %
+of the budget** - and `control_step` at ~130 µs. It fits on silicon, just.
+In Wokwi, whose CPU runs ~5x slower than its SysTick, it cannot: the world
+task has lesson 13's **overrun guard** (a cycle that ran late sleeps as long
+as it took - slow motion, not a frozen board), and `control` runs in
+**lock-step**, once per two world steps, as `host/sitl.c` calls it. `stats`
+prints the cycles and the `world overruns`.
 
 ---
 
@@ -926,7 +933,7 @@ sweep, P vs PD vs PID, noise vs filter, dead sensors, ambient light; two
 identical runs give identical results; the OLED frame drawn by the real
 `view.c`.
 
-**Built for the chip**: zero warnings, FLASH 29 504 B, RAM 9 800 B.
+**Built for the chip**: zero warnings, FLASH 29 968 B, RAM 9 832 B.
 
 **Not yet watched running in Wokwi.** What that leaves open:
 

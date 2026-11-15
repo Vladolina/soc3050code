@@ -103,6 +103,16 @@ static const char keys_help[] =
 static volatile uint32_t w_cyc_max, w_cyc_sum, w_n, c_cyc_max, c_cyc_sum, c_n;
 static volatile uint32_t d_ms_max, d_frames, oled_rc;
 
+/* The beat (lesson 13's fix, README Status).  "world" puts one item on
+ * beat_q every second step and waits on done_q; "control" waits for the
+ * beat, runs one step and answers.  So control runs exactly once per two
+ * physics steps at ANY CPU speed - 100 Hz on silicon, slower together with
+ * the physics in a simulator slower than real time - as host/sitl.c calls
+ * them, never on a stale or a doubled sample. */
+static os_queue_t beat_q, done_q;
+static uint8_t    beat_buf[1], done_buf[1];
+static volatile uint32_t world_overruns;
+
 static void say(const char *fmt, ...)
 {
     va_list ap;
@@ -142,9 +152,24 @@ static uint32_t cycles_now(void)
 static void task_world(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks();
+    uint32_t last = os_ticks(), beat = 0;
     for (;;) {
-        os_delay_until(&last, 1000u / WORLD_HZ);
+        /* Overrun guard.  os_delay_until() only sleeps when ahead of
+         * schedule, so a cycle (this step, plus control's, which we wait
+         * for) longer than 5 ms would never sleep, and as the highest
+         * priority it would starve every task below: no OLED, no buttons, no
+         * shell.  Wokwi does that - its CPU runs slower than its SysTick.
+         * Then sleep as long as the cycle took: the run goes into slow
+         * motion and the tasks below get about half the CPU.  On silicon a
+         * cycle is ~4.3 ms (lesson 10's M0+ model), so this does not fire. */
+        uint32_t took = os_ticks() - last;
+        if (took >= 1000u / WORLD_HZ) {
+            os_delay(took);
+            last = os_ticks();
+            world_overruns++;
+        } else {
+            os_delay_until(&last, 1000u / WORLD_HZ);
+        }
 
         if (req_track >= 0) {                   /* new track, or back to the line */
             os_mutex_lock(&track_lock);
@@ -173,6 +198,12 @@ static void task_world(void *arg)
 
         w_cyc_sum += c;  w_n++;
         if (c > w_cyc_max) { w_cyc_max = c; }
+
+        if ((++beat & 1u) == 0) {                  /* every 2nd step: control */
+            uint8_t b = 0;
+            os_queue_put(&beat_q, &b);
+            os_queue_get(&done_q, &b);             /* wait till it has run    */
+        }
     }
 }
 
@@ -183,9 +214,10 @@ static void task_world(void *arg)
 static void task_control(void *arg)
 {
     (void)arg;
-    uint32_t last = os_ticks(), seen = run_id;
+    uint32_t seen = run_id;
     for (;;) {
-        os_delay_until(&last, 1000u / CONTROL_HZ);
+        uint8_t b;
+        os_queue_get(&beat_q, &b);                 /* every 2nd world step    */
         if (seen != run_id) { seen = run_id; control_reset(); }
 
         sensors_t s;
@@ -209,6 +241,7 @@ static void task_control(void *arg)
             c_cyc_sum += c;  c_n++;
             if (c > c_cyc_max) { c_cyc_max = c; }
         }
+        os_queue_put(&done_q, &b);                 /* world: go on            */
     }
 }
 
@@ -415,6 +448,8 @@ static void cmd_stats(void)
     say("control step: avg %lu, max %lu cycles  (%lu / %lu us of every 10000)\n",
         (unsigned long)(c_cyc_sum / cn), (unsigned long)c_cyc_max,
         (unsigned long)(c_cyc_sum / cn / hz), (unsigned long)(c_cyc_max / hz));
+    say("world overruns %lu (each a 5 ms cycle that ran late: slow motion)\n",
+        (unsigned long)world_overruns);
     say("display     : %lu frames, slowest flush %lu ms, %lu bytes sent, oled rc %ld\n",
         (unsigned long)d_frames, (unsigned long)d_ms_max,
         (unsigned long)oled_bytes_sent(), (long)(int32_t)oled_rc);
@@ -517,6 +552,8 @@ int main(void)
     printf("  station  : uv run tools/station/station.py - the OLED large, the race from above\n");
     printf("%s\n", keys_help);
     kbd_init(&kbd);
+    os_queue_init(&beat_q, beat_buf, 1, 1);
+    os_queue_init(&done_q, done_buf, 1, 1);
 
     os_task_create("world",   task_world,   0, stk_world, W_WORLD, 5);
     os_task_create("control", task_control, 0, stk_ctl,   W_CTL,   4);

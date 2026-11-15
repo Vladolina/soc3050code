@@ -49,8 +49,8 @@ simulate.bat
 Zero warnings, and close to:
 
 ```
-           FLASH:       31120 B        32 KB     94.97%
-             RAM:       11640 B        12 KB     94.73%
+           FLASH:       31288 B        32 KB     95.48%
+             RAM:       11648 B        12 KB     94.79%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the OLED, joystick,

@@ -78,6 +78,28 @@ static os_mutex_t kbd_lock;        /* the station's keys: shell feeds, ui reads 
 static volatile uint8_t  show_truth;
 static volatile uint32_t run_start;        /* world time when RUN began      */
 static volatile uint32_t ctrl_cycles_max, world_cycles_max, flush_ms_max;
+static volatile uint32_t world_overruns, robot_overruns;
+
+/* Overrun guard (lesson 13's, README Status).  os_delay_until() only sleeps
+ * when ahead of schedule, so a task whose step takes longer than its period
+ * never sleeps and starves every task below it: in Wokwi, whose CPU runs
+ * ~5x slower than its SysTick, a 16 ms robot step becomes ~80 ms of its 40
+ * and ui and shell would never run.  When the last period overran, sleep as
+ * long as it took instead: that task runs at about half its rate, and the
+ * tasks below get the rest.  On silicon neither task overruns.  (No lock-step
+ * here, unlike 13-15: a planner that answers late, on a world that has moved
+ * on, is this lesson's subject - see the budget in `stats`.) */
+static void keep_time(uint32_t *last, uint32_t period, volatile uint32_t *overruns)
+{
+    uint32_t took = os_ticks() - *last;
+    if (took >= period) {
+        os_delay(took);
+        *last = os_ticks();
+        (*overruns)++;
+    } else {
+        os_delay_until(last, period);
+    }
+}
 static volatile int      level = 0;
 static volatile uint8_t  custom_loaded;
 static volatile uint8_t  nav_quiet;        /* "quiet": no periodic $NAV      */
@@ -224,7 +246,7 @@ static void task_world(void *arg)
     (void)arg;
     uint32_t last = os_ticks();
     for (;;) {
-        os_delay_until(&last, WORLD_MS);
+        keep_time(&last, WORLD_MS, &world_overruns);
         actuators_t cmd;
         __disable_irq(); cmd = shared_cmd; __enable_irq();
 
@@ -252,7 +274,7 @@ static void task_robot(void *arg)
     int      last_mode = NAV_IDLE;
     unsigned last_coll = 0;
     for (;;) {
-        os_delay_until(&last, CONTROL_MS);
+        keep_time(&last, CONTROL_MS, &robot_overruns);
         sensors_t s;
         __disable_irq(); s = shared_sens; __enable_irq();
 
@@ -428,6 +450,8 @@ static void cmd_stats(void)
     say("budget  : control_step peak %lu us of %u ms, world_step peak %lu us of %u ms, OLED flush peak %lu ms\n",
         (unsigned long)(ctrl_cycles_max / 48u), CONTROL_MS, (unsigned long)(world_cycles_max / 48u), WORLD_MS,
         (unsigned long)flush_ms_max);
+    say("overruns: world %lu, robot %lu (each a period that ran late: slow motion)\n",
+        (unsigned long)world_overruns, (unsigned long)robot_overruns);
     say("safety  : %u braking steps, %u bumper backups, %u vetoes; gyro bias measured %ld urad/s\n",
         st.brakes, st.backups, st.vetoes, (long)st.gyro_bias_urad_s);
     say("RAM     : navigation %lu B (A* %lu B); OLED %lu bytes sent in %lu flushes\n",

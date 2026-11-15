@@ -51,7 +51,7 @@ build.bat
 simulate.bat
 ```
 
-Zero warnings, and about **FLASH 29 504 B, RAM 9 800 B**. Paste
+Zero warnings, and about **FLASH 29 968 B, RAM 9 832 B**. Paste
 `diagram.json` into the Wokwi tab (**required** — the OLED, joystick,
 buttons, knob and buzzer all live there), then `F1` → **Upload Firmware and
 Start Simulation…** → `Main.elf`. The serial monitor shows:
