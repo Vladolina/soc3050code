@@ -4,6 +4,14 @@
  * Lesson 08 is where this file is written and taken apart; keep this copy in
  * step with 08_UART_And_Python_Host/uart.c.  Needs LIBS=os as well.
  *
+ * ONE DELIBERATE DIFFERENCE from lesson 08's copy: RX is a lock-free ring
+ * too, and the ISR never calls the kernel.  Wokwi ignores PRIMASK
+ * (_diag_primask), so an ISR calling os_queue_put_from_isr() could break
+ * into a task's kernel critical section; and holding the USART interrupt
+ * off instead made Wokwi drop received bytes with no overrun flag (lesson
+ * 14, 2026-11-16).  The reader sleeps 1 ms at a time while the ring is
+ * empty, instead of blocking on a queue.
+ *
  * The UART is the Part 0 peripheral model once more:
  *   clock gate  RCC->APBENR1 USART2EN
  *   control     CR1 (enable, TE, RE, and the two interrupt enables used here)
@@ -13,8 +21,8 @@
  * BOTH directions.
  *
  * Two different buffers, on purpose:
- *   RX  - a kernel queue (lesson 07).  The ISR produces with the ISR-safe put;
- *         a task consumes and BLOCKS while it is empty.  Locking inside.
+ *   RX  - a lock-free single-producer / single-consumer ring: the ISR
+ *         writes rx_head, the reading task rx_tail.  Empty: sleep 1 ms.
  *   TX  - a lock-free single-producer / single-consumer ring.  Tasks write
  *         head, the ISR writes tail, nobody writes both: lesson 03 slide 7's
  *         one-writer rule, applied to each index separately.  No lock at all.
@@ -29,14 +37,15 @@
 #define RX_PIN      3u            /* PA3 - USART2 RX, AF1 */
 #define AF_USART2   1u
 
-#define RX_DEPTH    64u
+#define RX_SIZE     128u          /* a power of two; 11 ms of 115200 baud */
 #define TX_SIZE     256u          /* a power of two: % becomes a mask */
 
 static volatile uart_stats_t stats;
 
 /* ---- RX: interrupt -> queue -> task --------------------------------------- */
-static uint8_t    rx_store[RX_DEPTH];
-static os_queue_t rx_queue;
+static uint8_t           rx_ring[RX_SIZE];
+static volatile uint16_t rx_head;      /* written ONLY by the ISR                */
+static volatile uint16_t rx_tail;      /* written ONLY by the reader (one task)  */
 
 /* ---- TX: task -> lock-free ring -> interrupt ------------------------------- */
 static uint8_t           tx_ring[TX_SIZE];
@@ -49,8 +58,6 @@ void uart_init(uint32_t pclk, uint32_t baud)
     RCC->APBENR1 |= RCC_APBENR1_USART2EN;
     pin_af(GPIOA, TX_PIN, AF_USART2);
     pin_af(GPIOA, RX_PIN, AF_USART2);
-
-    os_queue_init(&rx_queue, rx_store, 1, RX_DEPTH);
 
     USART2->BRR = (pclk + baud / 2u) / baud;             /* 48 MHz / 115200 = 417 */
     USART2->CR1 = USART_CR1_TE | USART_CR1_RE
@@ -66,8 +73,10 @@ void uart_init(uint32_t pclk, uint32_t baud)
 
 uint8_t uart_getc(void)
 {
-    uint8_t c;
-    os_queue_get(&rx_queue, &c);                          /* blocks while empty */
+    while (rx_tail == rx_head) { os_delay(1); }           /* empty: sleep 1 ms  */
+    uint8_t c = rx_ring[rx_tail];                         /* read BEFORE moving */
+    __COMPILER_BARRIER();
+    rx_tail = (uint16_t)((rx_tail + 1u) % RX_SIZE);
     return c;
 }
 
@@ -98,8 +107,13 @@ void USART2_IRQHandler(void)
     if (isr & USART_ISR_RXNE_RXFNE) {
         uint8_t c = (uint8_t)USART2->RDR;                /* reading RDR clears RXNE */
         stats.rx_bytes++;
-        if (!os_queue_put_from_isr(&rx_queue, &c)) {     /* never blocks in an ISR  */
+        uint16_t next = (uint16_t)((rx_head + 1u) % RX_SIZE);
+        if (next == rx_tail) {                           /* full: keep the oldest   */
             stats.rx_dropped++;
+        } else {
+            rx_ring[rx_head] = c;                        /* data BEFORE the index   */
+            __COMPILER_BARRIER();
+            rx_head = next;
         }
     }
 

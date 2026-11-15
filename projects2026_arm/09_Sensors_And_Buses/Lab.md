@@ -34,8 +34,8 @@ simulate.bat
 Zero warnings:
 
 ```
-           FLASH:       11484 B        32 KB     35.05%
-             RAM:        7536 B        12 KB     61.33%
+           FLASH:       11172 B        32 KB     34.09%
+             RAM:        7592 B        12 KB     61.78%
 ```
 
 Paste `diagram.json` — a potentiometer, an MPU6050, a MAX7219 matrix — and

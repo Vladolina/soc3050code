@@ -37,7 +37,7 @@ PC to measure everything this README quotes.
 ## Build and run
 
 ```
-build.bat        # FLASH 29816 B / 32 KB, RAM 9752 B / 12 KB, zero warnings
+build.bat        # FLASH 29504 B / 32 KB, RAM 9800 B / 12 KB, zero warnings
 simulate.bat
 host\run.bat     # the races, on the PC: PASS: 0 failure(s)
 uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart LINE,3,-400,400
@@ -87,7 +87,7 @@ so `ui` went to **288 words** to keep about a quarter spare. `display` also
 builds a `$FB` frame after each flush (`mirror_next` 40 B + `build` 128 B +
 `snprintf`, ≈ 710 B deep with its own frame) and stayed at 256; its 96-byte
 frame buffer is `static`, not on the stack. `kbd_t` and the mirror's hashes
-add ~170 B of `.bss`. **RAM 9 752 B.** Read `stats` before trusting this.
+add ~170 B of `.bss`. **RAM 9 800 B.** Read `stats` before trusting this.
 `stats` prints the real high-water marks; check them before shrinking.
 
 ## Facts checked against sources, not memory
@@ -127,7 +127,7 @@ add ~170 B of `.bss`. **RAM 9 752 B.** Read `stats` before trusting this.
 
 ## Status
 
-- **Builds with zero warnings**: FLASH 29 816 B, RAM 9 752 B.
+- **Builds with zero warnings**: FLASH 29 504 B, RAM 9 800 B.
 - **The station route** (`$KEY` keys, `$FB` mirror, `quiet`/`loud`, the
   `l15_line.py` view) is built and its view tested on the PC with frames
   from the real `world.c`; **not yet watched in Wokwi**.

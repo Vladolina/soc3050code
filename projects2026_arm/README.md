@@ -373,13 +373,13 @@ every host test passes:
 | 10 | 27 368 / 8 016 | Q15/Q16 maths 15/15; a Cortex-M0+ instruction model (`host/m0sim.py`) runs `Main.elf` and agrees with the PC on 21 of 22 workloads |
 | 11 | 25 340 / 5 256 | 107/107; the fault decoder agrees with `objdump` on all 2327 load, store, branch and trap instructions in the image |
 | 12 | 19 304 / 4 896 | 45/45; each game played by script, by terminal keys and by `$KEY` frames; the OLED mirror; Snake costs 50 bus bytes a frame against 1104 for a full repaint (games at half speed since 2026-11-03) |
-| 13 | 29 112 / 11 144 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
-| 14 | 30 248 / 10 816 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
-| 15 | 29 816 / 9 752 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
-| 16 | 31 432 / 11 592 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
-| 17 | 26 612 / 10 408 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
-| 18 | 29 576 / 9 872 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
-| 19 | 19 112 / 10 560 | 15/15; the template's health and watchdog logic |
+| 13 | 28 956 / 11 200 | 24/24; a 20° roll step settles in 0.34 s with 0.3 % overshoot |
+| 14 | 30 092 / 10 864 | default mission 57.7 s in still air, 61.0 s in 8 m/s wind; all failsafes fire |
+| 15 | 29 504 / 9 800 | all four tracks, five laps each, no DNF; PD beats P-only 3.80 s to 12.56 s a lap |
+| 16 | 31 120 / 11 640 | 25/25 runs reach the goal, 0 collisions; `planner.py` and the C A* agree 15/15 |
+| 17 | 26 300 / 10 464 | LQR survives the biggest push (0.78 N s); the cascaded PID settles faster and carries more payload |
+| 18 | 29 264 / 9 928 | a 1500-match league in 1.9 s, identical hash on two runs and at -O0/-O2/-Os |
+| 19 | 18 800 / 10 608 | 15/15; the template's health and watchdog logic |
 
 FLASH / RAM for 12-19 are the 2026-11-03 builds, after the station wiring
 (`kbd`, `mirror`, `keys`): 1.9-2.5 KB more flash and 250-600 B more RAM each.

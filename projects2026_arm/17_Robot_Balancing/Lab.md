@@ -40,8 +40,8 @@ simulate.bat
 Zero warnings:
 
 ```
-           FLASH:       26612 B        32 KB     81.21%
-             RAM:       10408 B        12 KB     84.70%
+           FLASH:       26300 B        32 KB     80.26%
+             RAM:       10464 B        12 KB     85.16%
 ```
 
 Paste `diagram.json` (the app board: OLED, joystick, A, B, knob, buzzer) and

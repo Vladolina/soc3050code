@@ -35,8 +35,8 @@ simulate.bat
 Zero warnings:
 
 ```
-           FLASH:       12200 B        32 KB     37.23%
-             RAM:        6528 B        12 KB     53.12%
+           FLASH:       12088 B        32 KB     36.89%
+             RAM:        6520 B        12 KB     53.06%
 ```
 
 FLASH has grown by about 4 KB since lesson 07. **Guess first:** what for?

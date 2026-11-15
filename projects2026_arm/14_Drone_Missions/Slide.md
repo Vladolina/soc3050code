@@ -1514,7 +1514,7 @@ Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings;
 with the station's keys and OLED mirror (slide 24) **29 600 B (90.3 %),
 10 776 B (87.7 %)**; with lesson 13's lock-step and overrun guard (slide 26) and the kernel's
 Wokwi guards
-**30 248 B (92.3 %), 10 816 B (88.0 %)**.
+**30 092 B (91.8 %), 10 864 B (88.4 %)**.
 
 The stack sizes come from `-fstack-usage` plus the C library's prologues (the
 `link` task's deepest path, `ml_handle` → `vframe` → `vsnprintf`, is about

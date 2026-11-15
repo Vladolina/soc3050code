@@ -46,7 +46,7 @@ polling.
 ## Build and run
 
 ```
-build.bat        # FLASH 19112 B / 32 KB, RAM 10560 B / 12 KB, zero warnings
+build.bat        # FLASH 18800 B / 32 KB, RAM 10608 B / 12 KB, zero warnings
 host\run.bat     # 15 checks, 0 failed, exit code 0
 simulate.bat
 uv run ..\08_UART_And_Python_Host\host.py --file capture.txt --chart SYS,2,0,1000
@@ -151,8 +151,8 @@ watchdog, profiling, shell — carries over unchanged.
 
 | Item | Bytes |
 |---|---|
-| FLASH | 19 112 of 32 768 |
-| RAM | 10 560 of 12 288 |
+| FLASH | 18 800 of 32 768 |
+| RAM | 10 608 of 12 288 |
 | task stacks (input 160, app 256, telem 288, display 224, health 256, shell 320 words) | 6 016 |
 | idle stack | 256 |
 | OLED framebuffer | 1 032 |
@@ -223,7 +223,7 @@ It is left in deliberately: Lab Part 5 is a contest to cut it.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 19 112 B, RAM 10 560 B.
+- Builds with **zero warnings**: FLASH 18 800 B, RAM 10 608 B.
 - Host tests: **15 checks, 0 failed** — numbers above.
 - **Not yet watched running in Wokwi.** Nothing in this lesson has run on a
   simulated or real STM32: not the tasks, the shell, the profiling or the

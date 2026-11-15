@@ -9,9 +9,10 @@
  * msr PRIMASK, SysTick, PendSV and a peripheral IRQ all still ran.  Lesson
  * 14 froze from it: a task was switched out between "state = BLOCKED" and
  * "waiting_on = q", so the put that should have woken it matched nothing.
- *   1. OS_SIM_GATES: a critical section also closes SysTick's TICKINT and
- *      the NVIC lines, which Wokwi does honour - see enter().  This is the
- *      fix.  On silicon it is redundant: PRIMASK already did it.
+ *   1. OS_SIM_GATES: a critical section also closes SysTick's TICKINT,
+ *      which Wokwi does honour - see enter().  This is the fix.  On silicon
+ *      it is redundant: PRIMASK already did it.  ISRs must therefore not
+ *      call the kernel in Wokwi; _lib/uart.c no longer does.
  *   2. OS_REWAKE_MS: every 10 ticks SysTick wakes every blocked task.  Every
  *      wait below sits in a while loop that re-checks its condition, so a
  *      wake for nothing is harmless - it looks, and blocks again.  A safety
@@ -68,12 +69,15 @@ static inline void leave(cs_t pm) { __set_PRIMASK(pm); }
 /* OS_SIM_GATES (os.h): Wokwi ignores PRIMASK - _diag_primask measured
  * SysTick, PendSV and TIM14 all breaking into cpsid i and msr PRIMASK
  * sections, but SysTick stayed out while its TICKINT bit was off.  So a
- * critical section ALSO shuts the sources: TICKINT, and every enabled NVIC
- * line (ICER).  On silicon PRIMASK already did the job and this is a few
- * extra register writes.  Closing TICKINT can lose a tick that falls inside
- * the section; COUNTFLAG says one did, and leave() pends it by hand. */
-typedef struct { uint32_t pm, iser, tick; } cs_t;
-static volatile uint32_t gates_iser;             /* NVIC lines open outside   */
+ * critical section ALSO shuts SysTick's TICKINT: SysTick is the only thing
+ * that preempts one task with another, so that is what keeps the kernel's
+ * lists consistent between tasks.  Peripheral IRQs are NOT gated: holding
+ * the USART's off made Wokwi drop received bytes (with no overrun flag), so
+ * instead no ISR in lessons 09-19 calls the kernel (_lib/uart.c receives
+ * into a lock-free ring).  On silicon PRIMASK already did the job and this
+ * is a few register writes.  Closing TICKINT can lose a tick that falls
+ * inside the section; COUNTFLAG says one did, and leave() pends it by hand. */
+typedef struct { uint32_t pm, tick; } cs_t;
 
 static __attribute__((noinline)) cs_t enter(void)
 {
@@ -83,35 +87,29 @@ static __attribute__((noinline)) cs_t enter(void)
     uint32_t c = SysTick->CTRL;                  /* reading clears COUNTFLAG  */
     s.tick = c & SysTick_CTRL_TICKINT_Msk;
     SysTick->CTRL = c & ~SysTick_CTRL_TICKINT_Msk;
-    s.iser = NVIC->ISER[0];
-    NVIC->ICER[0] = s.iser;
-    if (s.tick) { gates_iser = s.iser; }         /* outermost: remember open  */
     __DSB(); __ISB();
     return s;
 }
 
-static inline void reopen(uint32_t iser, uint32_t tick)
+static inline void reopen_tick(void)
 {
-    NVIC->ISER[0] = iser;
-    if (tick) {
-        uint32_t c = SysTick->CTRL;
-        SysTick->CTRL = c | SysTick_CTRL_TICKINT_Msk;
-        if (c & SysTick_CTRL_COUNTFLAG_Msk) { SCB->ICSR = SCB_ICSR_PENDSTSET_Msk; }
-    }
+    uint32_t c = SysTick->CTRL;
+    SysTick->CTRL = c | SysTick_CTRL_TICKINT_Msk;
+    if (c & SysTick_CTRL_COUNTFLAG_Msk) { SCB->ICSR = SCB_ICSR_PENDSTSET_Msk; }
 }
 
 static __attribute__((noinline)) void leave(cs_t s)
 {
-    reopen(s.iser, s.tick);
+    if (s.tick) { reopen_tick(); }               /* only the outermost opens  */
     __set_PRIMASK(s.pm);
 }
 
 /* Called by PendSV_Handler before it returns into the next task.  In Wokwi
  * PendSV runs the moment schedule() pends it, INSIDE the outgoing task's
- * section, so the incoming task would inherit closed gates; open them, as
+ * section, so the incoming task would inherit a closed tick; open it, as
  * the handler's cpsie i opens PRIMASK.  On silicon PendSV only runs outside
- * every section, so the gates are already open. */
-void os_gates_open(void) { reopen(gates_iser, 1u); }
+ * every section, so the tick is already open. */
+void os_gates_open(void) { reopen_tick(); }
 #endif
 
 /* ---- the scheduler -------------------------------------------------------
@@ -306,9 +304,6 @@ void os_start(void)
     SysTick_Config(SystemCoreClock / OS_TICK_HZ);/* handler; SysTick also 3   */
 
     __disable_irq();
-#if OS_SIM_GATES
-    gates_iser = NVIC->ISER[0];                  /* the lines main() opened   */
-#endif
     os_current = 0;
     os_next    = pick();
     SCB->ICSR  = SCB_ICSR_PENDSVSET_Msk;

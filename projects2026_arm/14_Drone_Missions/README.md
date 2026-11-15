@@ -44,7 +44,7 @@ waypoints, altitude, battery, wind.
 ## Build and run
 
 ```
-build.bat        # FLASH 30248 B / 32 KB (92.3 %), RAM 10816 B / 12 KB (88.0 %), zero warnings
+build.bat        # FLASH 30092 B / 32 KB (91.8 %), RAM 10864 B / 12 KB (88.4 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
 uv run host\mission.py host\default.mission          # frames to type/paste into Wokwi
@@ -152,11 +152,11 @@ reports `LANDED` — it cannot tell a crash from a landing.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 30 248 B, RAM 10 816 B. The station's
+- Builds with **zero warnings**: FLASH 30 092 B, RAM 10 864 B. The station's
   keys and OLED mirror (`keys kbd mirror` and their glue in `Main.c`) cost
   2104 B of flash and 256 B of RAM over the 27 496 / 10 520 before them; the
-  lock-step below another 304 B and 32 B, the kernel's Wokwi guards in
-  `_lib/os.c` 332 B and 8 B.
+  lock-step below another 304 B and 32 B, the Wokwi fixes in `_lib/os.c`
+  and `_lib/uart.c` 188 B and 56 B (a 128-byte RX ring).
 - Host tests: **all pass** (above). They do not link `Main.c` or `os.c`, so
   they say nothing about either fix below.
 - **Fix 1 - "does not start" in Wokwi (reported 2026-11-16).** This lesson
@@ -225,14 +225,29 @@ reports `LANDED` — it cannot tell a crash from a landing.
   On silicon every figure that broke in is 0. So in Wokwi **no** `cpsid i`
   section protects anything - the kernel's, `print_lock`'s, or a lesson's.
   `_lib/os.c` now has `OS_SIM_GATES` (`os.h`, on): a critical section also
-  clears SysTick's TICKINT and every NVIC enable (ICER), restores them on
-  the way out (pending a tick lost meanwhile, from COUNTFLAG), and
-  `PendSV_Handler` reopens them for the incoming task, since Wokwi takes
-  PendSV the moment `schedule()` pends it, still inside the section.
-  Redundant on silicon. Relies on Wokwi honouring ICER, which the probe's
-  test D checks; **neither that nor lesson 14 under the new kernel has run
-  in Wokwi yet.** Lessons' own `__disable_irq()` copies of shared structs
-  (in 09, 11-19) remain unprotected in Wokwi: a torn sample at worst.
+  clears SysTick's TICKINT and restores it on the way out (pending a tick
+  lost meanwhile, from COUNTFLAG), and `PendSV_Handler` reopens it for the
+  incoming task, since Wokwi takes PendSV the moment `schedule()` pends it,
+  still inside the section. Redundant on silicon.
+
+  A first version also cleared every NVIC enable (ICER). The probe's test D
+  showed Wokwi honours that (TIM14 broke in 0 of 4000 times, every one
+  delivered after ISER), and the same run caught a typed character's USART2
+  IRQ breaking into a PRIMASK section. But in lesson 14 it made **every**
+  incoming line fail its checksum: read with GDB, the RX ring held
+  `$MIRROR,104` and `MIRROR1*04`, while the driver counted no overrun.
+  Wokwi drops a received byte when the interrupt is late, without setting
+  ORE, and the gate held USART2 off through every kernel section on a CPU
+  ~5x slow. So peripheral IRQs are not gated; instead **no ISR calls the
+  kernel**: `_lib/uart.c` now receives into a lock-free 128-byte ring (the
+  ISR writes the head, `uart_getc()` the tail and sleeps 1 ms while it is
+  empty). Lesson 08 keeps its own queue-based copy - its subject.
+
+  **Watched in Wokwi the same day: a full mission with no error** - no
+  `CHECKSUM` refusal, and no garbled line out either, so the substituted
+  characters in `$TRU`/`$FB` had the same cause. Lessons' own
+  `__disable_irq()` copies of shared structs (09, 11-19) remain unprotected
+  in Wokwi: a torn sample at worst.
 - **Still to check in Wokwi** (two built-in missions have flown to the end):
   1. **`stats` after a minute of flight** — `world overruns` (Wokwi's
      slowdown, directly), the per-step cost of `ctl` and `world` (the M0+

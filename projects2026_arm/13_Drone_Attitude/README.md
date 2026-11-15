@@ -44,7 +44,7 @@ and Slide 22 measures what it costs.
 ## Build and run
 
 ```
-build.bat          # FLASH 29112 B / 32 KB, RAM 11144 B / 12 KB, zero warnings
+build.bat          # FLASH 28956 B / 32 KB, RAM 11200 B / 12 KB, zero warnings
 host\run.bat       # PASSED: 0 of 24 checks failed
 uv run host\cycles.py         # needs Main.elf; about 35 s
 simulate.bat
@@ -287,7 +287,7 @@ controls all respond). Two changes in `Main.c`:
 Still worth measuring when it runs: `world overruns` and the control-loop
 rate in `stats` give Wokwi's slowdown directly.
 
-Builds with **zero warnings** (FLASH 29 112 B, RAM 11 144 B). `host/run.bat`
+Builds with **zero warnings** (FLASH 28 956 B, RAM 11 200 B). `host/run.bat`
 passes **24 of 24** checks; `host/cycles.py` passes (48.8 % at 1 wait state).
 
 **Watched running in Wokwi (2026-11-08)**, after the scheduling fix above:

@@ -825,14 +825,14 @@ and worst `match_step()` in cycles. That is Lab Part 1's first number.
 | `fmath.h`'s `f_sin`/`f_cos` called through one out-of-line copy | 27 056 B | 83 % |
 | `i2c.c` and `beep.c` fixed for Wokwi (lesson 12, 2026-11-01) | 27 124 B | 83 % |
 | the station link: `$KEY` keys, OLED mirror, `$ARENA` poses | 29 244 B | 89 % |
-| the kernel's guards against Wokwi ignoring PRIMASK (`_lib/os.c`, 2026-11-16) | **29 576 B** | 90 % |
+| guards against Wokwi ignoring PRIMASK (`_lib/os.c`, `_lib/uart.c`, 2026-11-16) | **29 264 B** | 89 % |
 
 `sscanf` dragged in `_scanf_i`, `__ssvfscanf_r` and `strtol`/`strtoul` —
 **2.7 KB for parsing two numbers**. `fmath.h`'s functions are `static inline`,
 so each call site got its own polynomial; one out-of-line copy saved 0.5 KB
 with **bit-identical results** (the host hash did not change).
 
-RAM: **9 872 B** of 12 KB — three task stacks (512 + 384 + 384 words), the
+RAM: **9 928 B** of 12 KB — three task stacks (512 + 384 + 384 words), the
 OLED's 1 KB framebuffer, the match.
 
 What is left — about 0.4 KB under the line, 3.4 KB under 32 KB — is **your**

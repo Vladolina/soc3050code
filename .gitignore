@@ -61,6 +61,7 @@ projects2026_arm/**/*.o
 # check the firmware's pure-C logic). Derived, per machine - never committed.
 projects2026_arm/**/host/**/*.exe
 projects2026_arm/**/host/**/*.out
+projects2026_arm/**/host/build/
 projects2026_arm/**/__pycache__/
 projects2026_arm/**/host/__pycache__/
 projects2026_arm/_build/__pycache__/

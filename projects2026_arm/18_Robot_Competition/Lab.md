@@ -47,8 +47,8 @@ simulate.bat
 Zero warnings, and about:
 
 ```
-           FLASH:       29576 B        32 KB     90.26%
-             RAM:        9872 B        12 KB     80.34%
+           FLASH:       29264 B        32 KB     89.31%
+             RAM:        9928 B        12 KB     80.79%
 ```
 
 Paste `diagram.json` into Wokwi's `diagram.json` tab (the app board: OLED,
