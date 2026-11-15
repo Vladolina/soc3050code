@@ -1019,7 +1019,7 @@ Read honestly:
   `--pid` eigenvalues for tilt-only control.
 - `sitl.c`: every number on slides 9, 12, 14, 19 and 25; determinism; the
   OLED frame drawn pixel by pixel.
-- Firmware: **builds with zero warnings**, FLASH 26 328 B, RAM 10 408 B.
+- Firmware: **builds with zero warnings**, FLASH 26 612 B, RAM 10 408 B.
 
 **Not measured:**
 

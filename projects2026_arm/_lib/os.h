@@ -23,6 +23,11 @@
 #define OS_REWAKE_MS          10u     /* every 10 ticks SysTick wakes every
                                          BLOCKED task to re-check its wait;
                                          0 = off, as in lesson 07 (os.c)  */
+#define OS_SIM_GATES          1       /* critical sections also close
+                                         SysTick TICKINT and the NVIC lines,
+                                         because Wokwi ignores PRIMASK
+                                         (_diag_primask); 0 = PRIMASK only,
+                                         as in lesson 07                 */
 
 typedef enum { OS_READY, OS_SLEEPING, OS_BLOCKED } os_state_t;
 

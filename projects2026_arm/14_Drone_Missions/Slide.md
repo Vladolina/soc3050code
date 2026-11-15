@@ -1513,8 +1513,8 @@ The first build of this lesson **did not link**: FLASH 30 736 B, RAM
 Final: **FLASH 27 496 B (83.9 %), RAM 10 520 B (85.6 %)**, zero warnings;
 with the station's keys and OLED mirror (slide 24) **29 600 B (90.3 %),
 10 776 B (87.7 %)**; with lesson 13's lock-step and overrun guard (slide 26) and the kernel's
-re-wake
-**29 952 B (91.4 %), 10 808 B (88.0 %)**.
+Wokwi guards
+**30 248 B (92.3 %), 10 816 B (88.0 %)**.
 
 The stack sizes come from `-fstack-usage` plus the C library's prologues (the
 `link` task's deepest path, `ml_handle` → `vframe` → `vsnprintf`, is about

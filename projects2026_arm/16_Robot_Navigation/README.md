@@ -41,7 +41,7 @@ cell.
 ## Build and run
 
 ```
-build.bat          # FLASH 31148 B / 32 KB, RAM 11584 B / 12 KB, zero warnings
+build.bat          # FLASH 31432 B / 32 KB, RAM 11592 B / 12 KB, zero warnings
 simulate.bat       # paste diagram.json, upload Main.elf, press A
 host\run.bat       # or: bash host/run.sh - the whole robot on the PC, ~1 s
 uv run host\planner.py --level 4
@@ -190,12 +190,12 @@ at 8 s, `stats` at 55 s.
    path" to a reachable goal: now decrease-key, measured heap, overflow reported.
 7. A lost robot's estimate off the grid indexed past `cost[]`: clamped.
 8. Built at 34 932 B flash / 15 136 B RAM — did not fit. Slide 23 lists what
-   got it to 29 216 / 11 328 (31 148 / 11 584 since the station's keys and
+   got it to 29 216 / 11 328 (31 432 / 11 592 since the station's keys and
    mirror).
 
 ## Status
 
-Builds with **zero warnings**: FLASH 31 148 B, RAM 11 584 B. The host test
+Builds with **zero warnings**: FLASH 31 432 B, RAM 11 592 B. The host test
 passes (25/25 arrivals, 0 collisions at defaults, "no path" correct, C and
 Python A* identical 15/15), and the firmware ran all five levels to the goal
 in Renode with 0 collisions.

@@ -44,7 +44,7 @@ waypoints, altitude, battery, wind.
 ## Build and run
 
 ```
-build.bat        # FLASH 29952 B / 32 KB (91.4 %), RAM 10808 B / 12 KB (88.0 %), zero warnings
+build.bat        # FLASH 30248 B / 32 KB (92.3 %), RAM 10816 B / 12 KB (88.0 %), zero warnings
 simulate.bat     # paste diagram.json, upload Main.elf, press a
 host\run.bat     # the host tests (or: sh host/run.sh)
 uv run host\mission.py host\default.mission          # frames to type/paste into Wokwi
@@ -152,10 +152,11 @@ reports `LANDED` — it cannot tell a crash from a landing.
 
 ## Status
 
-- Builds with **zero warnings**: FLASH 29 952 B, RAM 10 808 B. The station's
+- Builds with **zero warnings**: FLASH 30 248 B, RAM 10 816 B. The station's
   keys and OLED mirror (`keys kbd mirror` and their glue in `Main.c`) cost
   2104 B of flash and 256 B of RAM over the 27 496 / 10 520 before them; the
-  lock-step below another 304 B and 32 B, the kernel's re-wake 48 B.
+  lock-step below another 304 B and 32 B, the kernel's Wokwi guards in
+  `_lib/os.c` 332 B and 8 B.
 - Host tests: **all pass** (above). They do not link `Main.c` or `os.c`, so
   they say nothing about either fix below.
 - **Fix 1 - "does not start" in Wokwi (reported 2026-11-16).** This lesson
@@ -210,8 +211,29 @@ reports `LANDED` — it cannot tell a crash from a landing.
   lines out are garbled too - `$TRU,3E700,...`, `$DRU,...`, a broken `$FB`,
   and `$MIS` 3 and 4 missing. Likely the same fault: if SysTick can switch
   tasks inside `os_mutex_lock()`'s critical section, two tasks can both
-  own `print_lock` and write the TX ring at once. Not yet proven.
-- **A whole mission not yet watched in Wokwi.** When someone flies one, look first at:
+  own `print_lock` and write the TX ring at once.
+- **Fix 3 - Wokwi ignores PRIMASK, measured (2026-11-16).** `_diag_primask/`
+  spends half its time masked and counts exceptions that arrive while
+  masked. Wokwi, one pass of 4000 sections each:
+
+  | masked by | SysTick (10 kHz) | PendSV pended inside | TIM14 pended inside |
+  |---|---|---|---|
+  | `cpsid i` | 44 974 of 89 002 broke in | 4000 of 4000 | 4000 of 4000 |
+  | `msr PRIMASK, 1` | 45 024 of 89 066 | 4000 of 4000 | 4000 of 4000 |
+  | SysTick TICKINT off | **0** of 43 799 | - | - |
+
+  On silicon every figure that broke in is 0. So in Wokwi **no** `cpsid i`
+  section protects anything - the kernel's, `print_lock`'s, or a lesson's.
+  `_lib/os.c` now has `OS_SIM_GATES` (`os.h`, on): a critical section also
+  clears SysTick's TICKINT and every NVIC enable (ICER), restores them on
+  the way out (pending a tick lost meanwhile, from COUNTFLAG), and
+  `PendSV_Handler` reopens them for the incoming task, since Wokwi takes
+  PendSV the moment `schedule()` pends it, still inside the section.
+  Redundant on silicon. Relies on Wokwi honouring ICER, which the probe's
+  test D checks; **neither that nor lesson 14 under the new kernel has run
+  in Wokwi yet.** Lessons' own `__disable_irq()` copies of shared structs
+  (in 09, 11-19) remain unprotected in Wokwi: a torn sample at worst.
+- **Still to check in Wokwi** (two built-in missions have flown to the end):
   1. **`stats` after a minute of flight** — `world overruns` (Wokwi's
      slowdown, directly), the per-step cost of `ctl` and `world` (the M0+
      model above says ~1 ms each) and every task's

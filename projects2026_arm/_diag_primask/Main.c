@@ -19,6 +19,8 @@
  *   mask:   A  cpsid i / cpsie i                (what os.c does)
  *           B  msr PRIMASK, 1 / msr PRIMASK, 0  (__set_PRIMASK)
  *           C  SysTick->CTRL TICKINT off / on   (gates SysTick only)
+ *           D  NVIC ICER / ISER                 (gates peripheral IRQs only;
+ *              what _lib/os.c's OS_SIM_GATES relies on)
  *   source: SysTick at 10 kHz, priority 3       (the kernel's tick)
  *           PendSV, pended INSIDE the section    (the kernel's switch)
  *           TIM14 IRQ, pended INSIDE the section via NVIC ISPR
@@ -42,7 +44,7 @@
 
 typedef struct { volatile uint32_t all, in_cs, pm1; } count_t;
 static count_t c_tick, c_pendsv, c_tim14, c_usart;
-static volatile uint32_t in_cs;
+static volatile uint32_t in_cs, saved_iser;
 
 static void note(count_t *c)
 {
@@ -73,7 +75,8 @@ static void mask(char how)
 {
     if      (how == 'A') { __disable_irq(); }
     else if (how == 'B') { __set_PRIMASK(1u); }
-    else                 { SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk; }
+    else if (how == 'C') { SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk; }
+    else                 { saved_iser = NVIC->ISER[0]; NVIC->ICER[0] = saved_iser; __DSB(); __ISB(); }
     __COMPILER_BARRIER();
     in_cs = 1u;
 }
@@ -84,7 +87,8 @@ static void unmask(char how)
     __COMPILER_BARRIER();
     if      (how == 'A') { __enable_irq(); }
     else if (how == 'B') { __set_PRIMASK(0u); }
-    else                 { SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; }
+    else if (how == 'C') { SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; }
+    else                 { NVIC->ISER[0] = saved_iser; }
 }
 
 static void row(const char *what, const count_t *c)
@@ -99,19 +103,18 @@ static void test(char how)
     zero();
     for (uint32_t r = 0; r < ROUNDS; r++) {
         mask(how);
-        if (how != 'C') {
-            SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;      /* asks for PendSV now  */
-            NVIC_SetPendingIRQ(TIM14_IRQn);          /* asks for TIM14 now   */
-        }
+        if (how == 'A' || how == 'B') { SCB->ICSR = SCB_ICSR_PENDSVSET_Msk; }   /* PendSV now */
+        if (how != 'C') { NVIC_SetPendingIRQ(TIM14_IRQn); }                     /* TIM14 now  */
         spin(SPIN);
         unmask(how);
         spin(SPIN);
     }
     static const char *const name[] = { "cpsid i / cpsie i", "msr PRIMASK 1 / 0",
-                                        "SysTick TICKINT off / on" };
+                                        "SysTick TICKINT off / on", "NVIC ICER / ISER" };
     printf("  %c  %s, %lu sections:\n", how, name[how - 'A'], (unsigned long)ROUNDS);
-    row("SysTick", &c_tick);
-    if (how != 'C') { row("PendSV", &c_pendsv); row("TIM14", &c_tim14); }
+    if (how != 'D') { row("SysTick", &c_tick); }
+    if (how == 'A' || how == 'B') { row("PendSV", &c_pendsv); }
+    if (how != 'C') { row("TIM14", &c_tim14); }
     if (c_usart.all) { row("USART2", &c_usart); }
 }
 
@@ -134,6 +137,7 @@ int main(void)
         test('A');
         test('B');
         test('C');
+        test('D');
         printf("=== end of pass %lu ===\n", (unsigned long)pass);
         spin(2000000u);
     }

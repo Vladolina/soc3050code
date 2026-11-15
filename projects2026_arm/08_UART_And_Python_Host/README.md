@@ -38,7 +38,7 @@ and sends those frames.
 ## Build and run
 
 ```
-build.bat        # FLASH 11916 B / 32 KB, RAM 6520 B / 12 KB, zero warnings
+build.bat        # FLASH 12200 B / 32 KB, RAM 6528 B / 12 KB, zero warnings
 simulate.bat
 uv run host.py --selftest
 ```
